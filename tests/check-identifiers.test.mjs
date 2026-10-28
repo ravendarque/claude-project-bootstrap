@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { findIdentifiers } from "../skills/bootstrap/scripts/check-identifiers.mjs";
 
@@ -62,4 +62,49 @@ test("CLI exits 0 when clean, reading patterns from IDENTIFIER_DENYLIST_FILE", (
     env: { PATH: process.env.PATH, IDENTIFIER_DENYLIST_FILE: list },
   });
   assert.equal(run.status, 0);
+});
+
+const gitAvailable = spawnSync("git", ["--version"]).status === 0;
+const needsGit = gitAvailable ? {} : { skip: "git is not installed" };
+
+function repo(files, ignore) {
+  const root = tree({ ...files, ".gitignore": ignore });
+  const run = (...args) => execFileSync("git", args, { cwd: root, stdio: "ignore" });
+  run("init", "-q");
+  run("add", ".gitignore", ...Object.keys(files).filter(name => name.startsWith("tracked")));
+  return root;
+}
+
+test("inside a git work tree, reports a tracked file", needsGit, () => {
+  const root = repo({ "tracked.md": "has forbidden-term\n" }, "ignored.md\n");
+  assert.deepEqual(findIdentifiers(root, [/forbidden-term/], []), [
+    { file: "tracked.md", line: 1, match: "forbidden-term" },
+  ]);
+});
+
+test("inside a git work tree, ignores gitignored and untracked files", needsGit, () => {
+  const root = repo(
+    { "tracked.md": "clean\n", "ignored.md": "forbidden-term\n", "untracked.md": "forbidden-term\n" },
+    "ignored.md\n",
+  );
+  assert.deepEqual(findIdentifiers(root, [/forbidden-term/], []), []);
+});
+
+test("inside a git work tree, scans only the given subdirectory", needsGit, () => {
+  const root = repo({ "tracked/a.md": "forbidden-term\n", "tracked-b/b.md": "forbidden-term\n" }, "");
+  const hits = findIdentifiers(join(root, "tracked"), [/forbidden-term/], []);
+  assert.deepEqual(hits, [{ file: "a.md", line: 1, match: "forbidden-term" }]);
+});
+
+test("a directory that git ignores is walked rather than silently skipped", needsGit, () => {
+  const root = repo({ "tracked.md": "clean\n", "out/a.md": "forbidden-term\n" }, "out/\n");
+  const hits = findIdentifiers(join(root, "out"), [/forbidden-term/], []);
+  assert.deepEqual(hits, [{ file: "a.md", line: 1, match: "forbidden-term" }]);
+});
+
+test("outside a git work tree, the directory walk still reports a match", () => {
+  const root = tree({ "a.md": "has forbidden-term\n" });
+  assert.deepEqual(findIdentifiers(root, [/forbidden-term/], []), [
+    { file: "a.md", line: 1, match: "forbidden-term" },
+  ]);
 });
