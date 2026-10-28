@@ -1,0 +1,1 @@
+{ "name": "h", "dependsOn": [], "overrides": ["CLAUDE.md"], "files": [{ "from": "templates/CLAUDE.md", "to": "CLAUDE.md" }], "requiredChecks": [], "claudeIndexLines": [] }

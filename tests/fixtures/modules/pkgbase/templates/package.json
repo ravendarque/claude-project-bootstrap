@@ -1,0 +1,5 @@
+{
+  "name": "{{slug}}",
+  "scripts": { "test": "vitest run" },
+  "devDependencies": { "vitest": "^5.0.0" }
+}

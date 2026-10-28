@@ -1,0 +1,3 @@
+### F standards
+
+- Rule F

@@ -30,3 +30,9 @@ Read a doc when the work touches it, not up front.
 
 - An Opus-class main session plans, decides and verifies; at most one Sonnet-class nested session does the mechanical work: [working with Claude](docs/working-with-claude.md).
 - Memory is one fact per file with `MEMORY.md` as the index: [working with Claude](docs/working-with-claude.md#memory).
+
+## This repository
+
+- It's a Claude Code plugin. The bootstrap skill is `skills/bootstrap/`, and each module is a folder under `skills/bootstrap/modules/`: [adding a module](docs/adding-a-module.md).
+- Run `npm test` before pushing. It needs no install: the plugin has no dependencies, by design.
+- The identifier guard keeps personal and source-project details out: `IDENTIFIER_DENYLIST_FILE=<your list> node skills/bootstrap/scripts/check-identifiers.mjs .`. The list itself is never committed.

@@ -1,0 +1,198 @@
+{
+  "name": "core",
+  "dependsOn": [],
+  "questions": [],
+  "files": [
+    {
+      "from": "templates/CLAUDE.md",
+      "to": "CLAUDE.md"
+    },
+    {
+      "from": "templates/README.md",
+      "to": "README.md"
+    },
+    {
+      "from": "templates/SECURITY.md",
+      "to": "SECURITY.md"
+    },
+    {
+      "from": "templates/LICENSE.md",
+      "to": "LICENSE.md"
+    },
+    {
+      "from": "templates/LICENSE-SCHEDULE.md",
+      "to": "LICENSE-SCHEDULE.md"
+    },
+    {
+      "from": "templates/gitignore",
+      "to": ".gitignore"
+    },
+    {
+      "from": "templates/docs/workflow.md",
+      "to": "docs/workflow.md"
+    },
+    {
+      "from": "templates/docs/versioning.md",
+      "to": "docs/versioning.md"
+    },
+    {
+      "from": "templates/docs/coding-standards.md",
+      "to": "docs/coding-standards.md"
+    },
+    {
+      "from": "templates/docs/definition-of-done.md",
+      "to": "docs/definition-of-done.md"
+    },
+    {
+      "from": "templates/docs/privacy.md",
+      "to": "docs/privacy.md"
+    },
+    {
+      "from": "templates/docs/data-protection.md",
+      "to": "docs/data-protection.md"
+    },
+    {
+      "from": "templates/docs/threat-model.md",
+      "to": "docs/threat-model.md"
+    },
+    {
+      "from": "templates/docs/working-with-claude.md",
+      "to": "docs/working-with-claude.md"
+    },
+    {
+      "from": "templates/docs/adr/README.md",
+      "to": "docs/adr/README.md"
+    },
+    {
+      "from": "templates/docs/adr/0001-record-architecture-decisions.md",
+      "to": "docs/adr/0001-record-architecture-decisions.md"
+    },
+    {
+      "from": "templates/docs/adr/0002-screen-dependencies-against-bds-boycott-lists.md",
+      "to": "docs/adr/0002-screen-dependencies-against-bds-boycott-lists.md"
+    },
+    {
+      "from": "templates/docs/runbooks/incident-response.md",
+      "to": "docs/runbooks/incident-response.md"
+    },
+    {
+      "from": "templates/docs/runbooks/post-incident-review.md",
+      "to": "docs/runbooks/post-incident-review.md"
+    },
+    {
+      "from": "templates/.claude/settings.json",
+      "to": ".claude/settings.json"
+    },
+    {
+      "from": "templates/.claude/skills/engineering-standards/SKILL.md",
+      "to": ".claude/skills/engineering-standards/SKILL.md"
+    },
+    {
+      "from": "templates/github/workflows/require-release-label.yml",
+      "to": ".github/workflows/require-release-label.yml"
+    },
+    {
+      "from": "templates/github/workflows/release.yml",
+      "to": ".github/workflows/release.yml"
+    },
+    {
+      "from": "templates/github/workflows/zizmor.yml",
+      "to": ".github/workflows/zizmor.yml",
+      "when": "!private"
+    },
+    {
+      "from": "templates/github/workflows/zizmor-private.yml",
+      "to": ".github/workflows/zizmor.yml",
+      "when": "private"
+    },
+    {
+      "from": "templates/github/workflows/scorecard.yml",
+      "to": ".github/workflows/scorecard.yml",
+      "when": "!private"
+    },
+    {
+      "from": "templates/github/workflows/dependency-review.yml",
+      "to": ".github/workflows/dependency-review.yml"
+    },
+    {
+      "from": "templates/github/workflows/project-status-sync.yml",
+      "to": ".github/workflows/project-status-sync.yml"
+    },
+    {
+      "from": "templates/github/scripts/plan-releases.mjs",
+      "to": ".github/scripts/plan-releases.mjs"
+    },
+    {
+      "from": "templates/github/scripts/check-release-paths.mjs",
+      "to": ".github/scripts/check-release-paths.mjs"
+    },
+    {
+      "from": "templates/github/release-paths.json",
+      "to": ".github/release-paths.json"
+    },
+    {
+      "from": "templates/github/dependabot.yml",
+      "to": ".github/dependabot.yml"
+    },
+    {
+      "from": "templates/github/zizmor.yml",
+      "to": ".github/zizmor.yml"
+    },
+    {
+      "from": "templates/github/pull_request_template.md",
+      "to": ".github/pull_request_template.md"
+    },
+    {
+      "from": "templates/github/ISSUE_TEMPLATE/bug.yml",
+      "to": ".github/ISSUE_TEMPLATE/bug.yml"
+    },
+    {
+      "from": "templates/github/ISSUE_TEMPLATE/feature.yml",
+      "to": ".github/ISSUE_TEMPLATE/feature.yml"
+    },
+    {
+      "from": "templates/github/ISSUE_TEMPLATE/config.yml",
+      "to": ".github/ISSUE_TEMPLATE/config.yml"
+    },
+    {
+      "from": "templates/bootstrap/ruleset.json",
+      "to": ".bootstrap/github/ruleset.json"
+    },
+    {
+      "from": "templates/bootstrap/repo-settings.json",
+      "to": ".bootstrap/github/repo-settings.json",
+      "when": "!private"
+    },
+    {
+      "from": "templates/bootstrap/repo-settings-private.json",
+      "to": ".bootstrap/github/repo-settings.json",
+      "when": "private"
+    },
+    {
+      "from": "templates/bootstrap/labels.json",
+      "to": ".bootstrap/github/labels.json"
+    }
+  ],
+  "requiredChecks": [
+    "check-label"
+  ],
+  "releasePaths": {
+    "noneAllowed": [
+      "docs/",
+      ".github/",
+      ".claude/",
+      ".gitignore",
+      "*.md"
+    ],
+    "noneForbidden": []
+  },
+  "claudeIndexLines": [],
+  "screening": [
+    {
+      "dependency": "GitHub (repository, Actions, Dependabot, Projects)",
+      "maintainer": "Microsoft",
+      "listed": "Y",
+      "note": "Free tier, industry standard, no viable alternative: allowed under the free-tool exception. Nothing is paid."
+    }
+  ]
+}

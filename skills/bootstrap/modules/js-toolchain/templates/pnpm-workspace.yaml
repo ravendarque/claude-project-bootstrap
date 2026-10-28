@@ -1,0 +1,8 @@
+# Three days: long enough for a compromised release to be caught and pulled.
+minimumReleaseAge: 4320
+
+# Install scripts are denied unless listed here with a reason.
+allowBuilds:
+{{allow_builds_yaml}}
+
+overrides: {}

@@ -1,0 +1,1 @@
+{ "name": "ws", "dependsOn": ["pkgext"], "files": [{ "from": "templates/ws.yaml", "to": "ws.yaml" }] }

@@ -1,0 +1,110 @@
+{
+  "name": "web-app",
+  "dependsOn": [
+    "js-toolchain"
+  ],
+  "questions": [],
+  "files": [
+    {
+      "from": "templates/package.json",
+      "to": "package.json",
+      "merge": true
+    },
+    {
+      "from": "templates/tsconfig.json",
+      "to": "tsconfig.json",
+      "merge": true
+    },
+    {
+      "from": "templates/vite.config.js",
+      "to": "vite.config.js"
+    },
+    {
+      "from": "templates/wdio.conf.js",
+      "to": "wdio.conf.js"
+    },
+    {
+      "from": "templates/e2e/accessibility.spec.js",
+      "to": "e2e/accessibility.spec.js"
+    },
+    {
+      "from": "templates/github/workflows/e2e.yml",
+      "to": ".github/workflows/e2e.yml"
+    },
+    {
+      "from": "templates/github/workflows/e2e-safari.yml",
+      "to": ".github/workflows/e2e-safari.yml",
+      "when": "!private"
+    },
+    {
+      "from": "templates/github/scripts/build-artefacts.sh",
+      "to": ".github/scripts/build-artefacts.sh"
+    },
+    {
+      "from": "templates/claude/launch.json",
+      "to": ".claude/launch.json"
+    },
+    {
+      "from": "templates/index.html",
+      "to": "index.html",
+      "stage": "app"
+    },
+    {
+      "from": "templates/src/main.js",
+      "to": "src/main.js",
+      "stage": "app"
+    },
+    {
+      "from": "templates/e2e/home.spec.js",
+      "to": "e2e/home.spec.js",
+      "stage": "app"
+    }
+  ],
+  "requiredChecks": [
+    "e2e",
+    {
+      "context": "e2e-safari",
+      "when": "!private"
+    }
+  ],
+  "releasePaths": {
+    "noneAllowed": [
+      "e2e/",
+      "wdio.conf.js"
+    ],
+    "noneForbidden": []
+  },
+  "claudeIndexLines": [
+    "- A browser app built with Vite and tested end to end with WebdriverIO in Chromium and Firefox (and Safari on macOS in CI for public repos), with axe-core checking WCAG 2.2 AA: [coding standards](docs/coding-standards.md#web-app)."
+  ],
+  "allowBuilds": {
+    "edgedriver": {
+      "allow": false,
+      "reason": "WebdriverIO's Edge driver: Edge isn't tested."
+    },
+    "geckodriver": {
+      "allow": false,
+      "reason": "WebdriverIO downloads the Firefox driver at run time, so its install script isn't needed."
+    }
+  },
+  "screening": [
+    {
+      "dependency": "Vite",
+      "maintainer": "VoidZero Inc.",
+      "listed": "N",
+      "note": ""
+    },
+    {
+      "dependency": "axe-core",
+      "maintainer": "Deque Systems",
+      "listed": "N",
+      "note": ""
+    },
+    {
+      "dependency": "WebdriverIO",
+      "maintainer": "OpenJS Foundation",
+      "listed": "N",
+      "note": "Chosen over Playwright, whose maintainer Microsoft is a consumer boycott target."
+    }
+  ]
+}

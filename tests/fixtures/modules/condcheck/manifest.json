@@ -1,0 +1,1 @@
+{ "name": "condcheck", "dependsOn": [], "files": [], "requiredChecks": ["always", { "context": "public-only", "when": "!private" }] }

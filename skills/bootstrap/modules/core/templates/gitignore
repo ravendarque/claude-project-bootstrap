@@ -1,0 +1,9 @@
+.bootstrap/
+.superpowers/
+.dev.vars
+.env*
+!.env.example
+node_modules/
+dist/
+artefacts/
+coverage/

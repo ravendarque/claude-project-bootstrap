@@ -1,0 +1,7 @@
+{
+  "name": "a",
+  "dependsOn": [],
+  "files": [{ "from": "templates/a.txt", "to": "a.txt" }],
+  "requiredChecks": ["lint"],
+  "claudeIndexLines": ["- A line"]
+}
