@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "dev": "pnpm build && wrangler dev",
+    "dev": "pnpm build && wrangler dev --port 5173",
     "preview": "pnpm build && wrangler dev --env e2e",
     "e2e:server": "pnpm build && wrangler dev --env e2e --port 4173"
   },

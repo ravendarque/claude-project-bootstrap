@@ -31,8 +31,26 @@ export function saveRun(dir, { answers, modules }) {
   save(dir, { ...loadState(dir), answers, modules });
 }
 
+const HOSTNAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+function checkQuestions(input, manifests) {
+  if (!["public", "private"].includes(input.visibility)) throw new Error("visibility must be public or private");
+  for (const { key, type } of manifests.flatMap(m => m.questions ?? [])) {
+    const value = input[key];
+    if (type === "boolean") {
+      if (typeof value !== "boolean") throw new Error(`${key} must be true or false`);
+    } else if (typeof value !== "string" || !value.trim()) {
+      throw new Error(`${key} is required`);
+    } else if (type === "hostname" && !HOSTNAME.test(value)) {
+      throw new Error(`${key} must be a domain name such as example.com`);
+    }
+  }
+}
+
 export function saveAnswers(dir, input, modules, modulesDir) {
-  const limit = maxSlugLength(resolveModules(modules, modulesDir));
+  const manifests = resolveModules(modules, modulesDir);
+  checkQuestions(input, manifests);
+  const limit = maxSlugLength(manifests);
   const { answers, slug } = validateAnswers(input, { maxSlugLength: limit });
   saveRun(dir, { answers, modules });
   writeAtomic(join(folder(dir), "answers.json"), `${JSON.stringify(input, null, 2)}\n`);

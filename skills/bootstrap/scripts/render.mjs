@@ -91,7 +91,7 @@ function standardsFragments(modules, modulesDir) {
 
 function allowBuildsYaml(modules) {
   return Object.entries(Object.assign({}, ...modules.map(m => m.allowBuilds ?? {})))
-    .map(([name, { allow, reason }]) => `  # ${reason}\n  ${name}: ${allow}`)
+    .map(([name, { allow, reason }]) => `  # ${reason.replace(/\s+/g, " ").trim()}\n  ${JSON.stringify(name)}: ${allow}`)
     .join("\n");
 }
 
@@ -99,7 +99,8 @@ function deepMerge(base, extra) {
   const merged = { ...base };
   for (const [key, value] of Object.entries(extra)) {
     const isObject = value && typeof value === "object" && !Array.isArray(value);
-    merged[key] = isObject && merged[key] && typeof merged[key] === "object" ? deepMerge(merged[key], value) : value;
+    const mergeable = merged[key] && typeof merged[key] === "object" && !Array.isArray(merged[key]);
+    merged[key] = isObject && mergeable ? deepMerge(merged[key], value) : value;
   }
   return merged;
 }
@@ -154,6 +155,7 @@ export function render({ modules, answers, modulesDir, destDir, dryRun = false, 
   const root = resolve(destDir);
   const outputs = new Map();
   const owners = new Map();
+  const mergers = new Map();
   for (const module of modules) {
     for (const file of module.files ?? []) {
       if (!included(file, answers)) continue;
@@ -171,7 +173,11 @@ export function render({ modules, answers, modulesDir, destDir, dryRun = false, 
       if (file.merge) {
         if (!owner) throw new Error(`${module.name} merges into ${rel}, but no earlier module writes it`);
         outputs.set(rel, `${JSON.stringify(deepMerge(JSON.parse(outputs.get(rel)), JSON.parse(content)), null, 2)}\n`);
+        mergers.set(rel, module.name);
         continue;
+      }
+      if (mergers.has(rel)) {
+        throw new Error(`${module.name} overrides ${rel}, which ${mergers.get(rel)} merges into; merge instead`);
       }
       if (owner && !(module.overrides ?? []).includes(rel)) {
         throw new Error(`${rel} is written by both ${owner} and ${module.name}; declare it in ${module.name}'s overrides`);

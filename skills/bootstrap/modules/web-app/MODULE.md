@@ -21,7 +21,8 @@ None.
   `e2e/accessibility.spec.js`, `.github/workflows/e2e.yml`,
   `.github/workflows/e2e-safari.yml` (public repos only: macOS minutes are
   billed at ten times the Linux rate on private ones),
-  `.github/scripts/build-artefacts.sh` (zips `dist/` for the release),
+  `.github/workflows/release-artefacts.yml` (when a release is published,
+  builds it and attaches `dist/` as `<slug>-dist.zip`),
   `.claude/launch.json`.
 - Application (first PR, `stage: app`): `index.html`, `src/main.js`,
   `e2e/home.spec.js`.
@@ -43,7 +44,7 @@ None.
 
 ## 7. Smoke check
 
-After js-toolchain's: `pnpm test:e2e && bash .github/scripts/build-artefacts.sh`.
-Both exit 0, the e2e run passes in Chromium and Firefox, and
-`artefacts/<slug>-dist.zip` exists. Safari runs only in CI: confirm the
+After js-toolchain's: `pnpm test:e2e && pnpm build`. Both exit 0 and the
+e2e run passes in Chromium and Firefox. After the first release, the
+release carries `<slug>-dist.zip`. Safari runs only in CI: confirm the
 `e2e-safari` check passes on the first PR (public repos).

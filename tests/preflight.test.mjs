@@ -58,11 +58,15 @@ test("preflight refuses an empty directory inside a git work tree", () => {
 
 test("tool checks cover core and dependencies of the selected modules", () => {
   const names = toolsFor(["cloudflare-opentofu"], realModulesDir);
-  for (const tool of ["git", "gh with project scope", "commit signing", "jq", "node >= 22", "pnpm", "firefox", "tofu", "wrangler"]) {
+  for (const tool of ["git", "gh with project scope", "commit signing", "jq", "node >= 22", "pnpm", "tofu", "wrangler"]) {
     assert.ok(names.includes(tool), tool);
   }
 });
 
 test("the cloudflare module checks for OpenTofu", () => {
   assert.ok(toolsFor(["cloudflare-opentofu"], realModulesDir).includes("tofu"));
+});
+
+test("browsers aren't preflight tools: WebdriverIO downloads them", () => {
+  assert.ok(!toolsFor(["web-app"], realModulesDir).includes("firefox"));
 });

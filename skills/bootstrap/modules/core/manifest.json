@@ -112,7 +112,8 @@
     },
     {
       "from": "templates/github/workflows/dependency-review.yml",
-      "to": ".github/workflows/dependency-review.yml"
+      "to": ".github/workflows/dependency-review.yml",
+      "when": "!private"
     },
     {
       "from": "templates/github/workflows/project-status-sync.yml",

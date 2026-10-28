@@ -28,6 +28,10 @@
       "to": "e2e/accessibility.spec.js"
     },
     {
+      "from": "templates/github/workflows/release-artefacts.yml",
+      "to": ".github/workflows/release-artefacts.yml"
+    },
+    {
       "from": "templates/github/workflows/e2e.yml",
       "to": ".github/workflows/e2e.yml"
     },
@@ -35,10 +39,6 @@
       "from": "templates/github/workflows/e2e-safari.yml",
       "to": ".github/workflows/e2e-safari.yml",
       "when": "!private"
-    },
-    {
-      "from": "templates/github/scripts/build-artefacts.sh",
-      "to": ".github/scripts/build-artefacts.sh"
     },
     {
       "from": "templates/claude/launch.json",

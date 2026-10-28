@@ -9,6 +9,7 @@ const renders = {
   core: renderReal([]),
   corePrivate: renderReal([], { visibility: "private" }),
   js: renderReal(["js-toolchain"]),
+  web: renderReal(["web-app"]),
   cfBeta: renderReal(["cloudflare-opentofu"], { ...cf, beta: true }),
   cfNoBeta: renderReal(["cloudflare-opentofu"], { ...cf, beta: false }),
 };
@@ -68,4 +69,40 @@ test("in-repo actions use the self-repository syntax", () => {
   for (const [name, dir] of Object.entries(renders)) {
     for (const wf of workflows(dir)) assert.doesNotMatch(read(dir, wf), /uses: \.\//, `${name} ${wf}`);
   }
+});
+
+test("private repos don't get dependency review", () => {
+  assert.ok(!existsSync(join(renders.corePrivate, ".github/workflows/dependency-review.yml")));
+  assert.ok(existsSync(join(renders.core, ".github/workflows/dependency-review.yml")));
+});
+
+test("infra PR plans and main applies never share a concurrency group", () => {
+  assert.match(
+    read(renders.cfBeta, ".github/workflows/infra.yml"),
+    /group: infra-\$\{\{ github\.event_name == 'pull_request' && github\.ref \|\| 'apply' \}\}/,
+  );
+});
+
+test("the release workflow doesn't depend on any module's local action", () => {
+  const release = read(renders.core, ".github/workflows/release.yml");
+  assert.doesNotMatch(release, /setup-node-pnpm/);
+  assert.doesNotMatch(release, /uses: \$\//);
+  assert.doesNotMatch(release, /artefact/);
+  assert.match(release, /GH_TOKEN: \$\{\{ steps\.app-token\.outputs\.token \}\}/);
+});
+
+test("web-app attaches its artefact when a release is published", () => {
+  const wf = read(renders.web, ".github/workflows/release-artefacts.yml");
+  assert.match(wf, /release:\n\s+types: \[published\]/);
+  assert.match(wf, /uses: \$\/\.github\/actions\/setup-node-pnpm/);
+  assert.match(wf, /gh release upload "\$TAG"/);
+  assert.match(wf, /contents: write/);
+});
+
+test("dependabot also updates the composite action's pinned actions", () => {
+  assert.match(read(renders.js, ".github/dependabot.yml"), /directories:\n\s+- "\/"\n\s+- "\/\.github\/actions\/\*"/);
+});
+
+test("cloudflare dev serves on the port the launch config expects", () => {
+  assert.match(JSON.parse(read(renders.cfBeta, "package.json")).scripts.dev, /--port 5173/);
 });

@@ -7,7 +7,7 @@
   "questions": [
     {
       "key": "zone_name",
-      "type": "string",
+      "type": "hostname",
       "prompt": "Which domain (Cloudflare zone) will the app be served from?"
     },
     {

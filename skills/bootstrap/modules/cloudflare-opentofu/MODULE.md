@@ -91,6 +91,9 @@ Then set each secret:
 
 Never add a per-Worker granular policy by editing an existing token.
 
+On a free private repo (no environments), drop every `--env <name>` above
+and set the secrets at repository level.
+
 **Verify (Claude runs):** ask the user to run, for each token,
 `curl -s -H "Authorization: Bearer <token>" https://api.cloudflare.com/client/v4/user/tokens/verify | jq .result.status`
 themselves (so the token never enters the conversation), then run
@@ -123,10 +126,13 @@ tokens, both applied to the `<slug>-tfstate` bucket only:
    `gh secret set TF_STATE_READ_ACCESS_KEY_ID --repo $R` and
    `gh secret set TF_STATE_READ_SECRET_ACCESS_KEY --repo $R`.
 
+On a free private repo (no environments), set the read-write pair at
+repository level too.
+
 **Verify (Claude runs):** `gh secret list --repo $R` and
 `gh secret list --repo $R --env infra`.
 **Expected:** the read-only pair at repository level, the read-write pair in
-`infra`.
+`infra` (or both at repository level on a free private repo).
 
 ### cloudflare-opentofu:4 Apply the infrastructure
 

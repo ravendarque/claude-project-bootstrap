@@ -10,11 +10,11 @@ and `templates/`.
 | `name` | Folder name |
 | `dependsOn` | Modules that must also be selected; the renderer pulls them in first |
 | `maxSlugLength` | The longest slug the module's derived names allow (default 63) |
-| `questions` | Interview questions: `{ key, type, prompt }` |
+| `questions` | Interview questions: `{ key, type, prompt }`, where `type` is `boolean`, `string` or `hostname`; answers are checked against it |
 | `files` | `{ from, to, when?, stage? }`; `when` is an answer key (truthy) or `!key` (falsy); `stage` is `initial` (default, pushed with the initial commit) or `app` (shipped in the first PR); `merge: true` deep-merges a JSON file into the one an earlier module writes |
 | `overrides` | Destination paths of other modules' files that this module replaces wholesale; prefer `merge` |
 | `allowBuilds` | pnpm install-script decisions: `{ "<package>": { "allow": true or false, "reason": "…" } }`, rendered into `pnpm-workspace.yaml` |
-| `requiredChecks` | Status check names added to the default branch ruleset |
+| `requiredChecks` | Status check names added to the default branch ruleset: a name, or `{ "context": name, "when": key }` to depend on an answer |
 | `releasePaths` | `{ noneAllowed, noneForbidden }` globs for the `release: none` guard |
 | `claudeIndexLines` | Lines added to the generated `CLAUDE.md` index |
 | `screening` | Dependency and vendor screening rows: `{ dependency, maintainer, listed, note }` |
@@ -30,8 +30,10 @@ Derived keys: `slug`, `required_checks_json`, `claude_index`,
 `name_js`, `greeting_js`, `name_html`. Never put `{{name}}` inside a JS
 string or HTML.
 
-A module that has a release artefact renders `.github/scripts/build-artefacts.sh`,
-which builds it into `artefacts/`. The release attaches whatever is there.
+A module with a release artefact renders its own workflow that runs on
+`release: published`, builds the artefact with the module's toolchain, and
+attaches it with `gh release upload`. Core's release workflow creates the
+release with the release App's token, which is what lets that event fire.
 
 ## MODULE.md sections
 

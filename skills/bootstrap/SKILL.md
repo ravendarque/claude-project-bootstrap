@@ -92,21 +92,30 @@ re-running a create:
      if it's more than six months old;
    - that the initial commit is pushed straight to `main` once, before
      protections exist, and never again.
-5. **`scaffold`**: `git init -b main`, then set the project's commit email
-   to the user's GitHub noreply address, so no personal address reaches a
-   public history: `git config user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"`.
+5. **`scaffold`**: `git init -b main`, then set the project's commit
+   identity to the user's GitHub login and noreply address, so no personal
+   name or address reaches a public history:
+   `git config user.name "$(gh api user --jq .login)"` and
+   `git config user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"`.
+   Prove signing still works with that identity before any real commit:
+   `git commit-tree -S -m check "$(git write-tree)"` must succeed (it makes
+   no commit on any branch). If it fails, GPG users need `user.signingkey`
+   set, and GitHub only shows a GPG signature as verified when the key's
+   user ids include the noreply address: tell the user and stop.
    Then render with `--stage initial`
    (no `--dry-run`). Run each module's scaffold instructions. Also render
    the full set (no `--stage`) into a temporary directory and run each
    module's smoke check there, so the first PR will be green. Fix template
    defects in the plugin, not by hand in the project.
 6. **`repo-created`**: `gh repo create $R --<visibility> --source <dir> --remote origin --description "<description>"`.
-7. **`initial-push`**: commit (signed) and `git push -u origin main`.
+7. **`initial-push`**: if `git log` shows no commit yet, commit (signed);
+   then `git push -u origin main`.
 8. **GitHub configuration**: each selected module's section 4, in module
    order, one step id per numbered item (`github:<module>:<n>`).
 9. **Manual steps** (`manual:<module>:<n>`): each one in turn. Give the
    instruction, wait for "done", run its verification, and only then mark it
-   done. A step marked "after the first PR" waits for phase 10.
+   done. A step marked "after the first PR" waits for phase 10: in the step
+   list you pass to `state.mjs next`, put its id after `first-pr-merged`.
 10. **`first-pr-merged`**: the first user-facing change ships through the
     project's own process and proves the pipeline.
     - If any selected module has `stage: "app"` files: find or create the

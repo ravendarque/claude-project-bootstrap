@@ -57,9 +57,6 @@ const TOOLS = {
     },
     { tool: "pnpm", check: () => ok(run("pnpm", ["--version"])), fix: "Run `corepack enable pnpm` or install pnpm" },
   ],
-  "web-app": [
-    { tool: "firefox", check: () => ok(run("firefox", ["--version"])), fix: "Install Firefox (end-to-end tests run in it)" },
-  ],
   "cloudflare-opentofu": [
     { tool: "tofu", check: () => ok(run("tofu", ["version"])), fix: "Install OpenTofu (https://opentofu.org/docs/intro/install/)" },
     {

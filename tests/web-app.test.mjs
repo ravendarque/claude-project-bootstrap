@@ -41,12 +41,12 @@ test("the ruleset requires e2e as well as the js checks", () => {
 
 test("unneeded driver install scripts are declined with a reason", () => {
   const ws = read("pnpm-workspace.yaml");
-  assert.match(ws, /\n  edgedriver: false/);
-  assert.match(ws, /\n  geckodriver: false/);
+  assert.match(ws, /\n  "edgedriver": false/);
+  assert.match(ws, /\n  "geckodriver": false/);
 });
 
 test("the release artefact build script and web standards exist", () => {
-  assert.ok([...files(dest)].includes(".github/scripts/build-artefacts.sh"));
+  assert.ok([...files(dest)].includes(".github/workflows/release-artefacts.yml"));
   assert.match(read("docs/coding-standards.md"), /### Web app/);
 });
 

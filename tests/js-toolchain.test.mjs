@@ -19,7 +19,7 @@ test("package.json has the standard scripts and no browser tooling", () => {
 test("pnpm holds new releases for three days and lists build decisions with reasons", () => {
   const ws = read("pnpm-workspace.yaml");
   assert.match(ws, /^minimumReleaseAge: 4320$/m);
-  assert.match(ws, /^allowBuilds:\n  # .+\n  esbuild: true$/m);
+  assert.match(ws, /^allowBuilds:\n  # .+\n  "esbuild": true$/m);
 });
 
 test("the ruleset requires the js checks", () => {

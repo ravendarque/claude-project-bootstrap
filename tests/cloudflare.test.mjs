@@ -15,7 +15,7 @@ test("cloudflare-opentofu pulls in web-app and js-toolchain and adds wrangler", 
   assert.ok(pkg.devDependencies.webdriverio);
   assert.ok(pkg.devDependencies.wrangler);
   assert.match(pkg.scripts["e2e:server"], /wrangler dev --env e2e/);
-  assert.match(read(withBeta, "pnpm-workspace.yaml"), /\n  workerd: true/);
+  assert.match(read(withBeta, "pnpm-workspace.yaml"), /\n  "workerd": true/);
 });
 
 test("beta adds a beta environment, its DNS record and the promote workflow", () => {

@@ -62,7 +62,7 @@ test("saveAnswers validates, saves the run and writes answers.json", () => {
 
 test("saveAnswers applies the selected modules' slug limit", () => {
   assert.throws(
-    () => saveAnswers(tmp(), { name: "x".repeat(45) }, ["cloudflare-opentofu"], realModulesDir),
+    () => saveAnswers(tmp(), { name: "x".repeat(45), visibility: "public", beta: false, zone_name: "example.com" }, ["cloudflare-opentofu"], realModulesDir),
     /allow at most 40/,
   );
 });
@@ -71,4 +71,29 @@ test("state writes leave no partial file behind", () => {
   const dir = tmp();
   markDone(dir, "preflight");
   assert.deepEqual(readdirSync(join(dir, ".bootstrap")), ["state.json"]);
+});
+
+test("saveAnswers requires visibility to be public or private", () => {
+  for (const visibility of [undefined, "Private", "internal"]) {
+    assert.throws(() => saveAnswers(tmp(), { name: "A", visibility }, [], realModulesDir), {
+      message: "visibility must be public or private",
+    });
+  }
+});
+
+test("saveAnswers checks each selected module's questions by type", () => {
+  const base = { name: "A", visibility: "public", zone_name: "example.com" };
+  assert.throws(() => saveAnswers(tmp(), { ...base, beta: "no" }, ["cloudflare-opentofu"], realModulesDir), {
+    message: "beta must be true or false",
+  });
+  assert.throws(() => saveAnswers(tmp(), { name: "A", visibility: "public", beta: true }, ["cloudflare-opentofu"], realModulesDir), {
+    message: "zone_name is required",
+  });
+});
+
+test("saveAnswers rejects a zone that isn't a hostname", () => {
+  assert.throws(
+    () => saveAnswers(tmp(), { name: "A", visibility: "public", beta: false, zone_name: 'ex"ample.com' }, ["cloudflare-opentofu"], realModulesDir),
+    { message: "zone_name must be a domain name such as example.com" },
+  );
 });

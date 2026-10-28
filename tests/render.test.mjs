@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { maxSlugLength, resolveModules, validateAnswers, render } from "../skills/bootstrap/scripts/render.mjs";
 
@@ -234,7 +234,7 @@ test("allow_builds_yaml lists every module's build decisions with reasons", () =
   render({ modules: resolveModules(["ws"], modulesDir), answers, modulesDir, destDir: dest });
   assert.equal(
     readFileSync(join(dest, "ws.yaml"), "utf8"),
-    "allowBuilds:\n  # Bundler binary.\n  esbuild: true\n  # Downloaded at runtime instead.\n  geckodriver: false\n",
+    "allowBuilds:\n  # Bundler binary.\n  \"esbuild\": true\n  # Downloaded at runtime instead.\n  \"geckodriver\": false\n",
   );
 });
 
@@ -248,4 +248,39 @@ test("required checks can depend on an answer", () => {
   };
   assert.equal(contexts("public"), '[{"context":"check-label"},{"context":"always"},{"context":"public-only"}]');
   assert.equal(contexts("private"), '[{"context":"check-label"},{"context":"always"}]');
+});
+
+test("an override can't silently drop an earlier merge", () => {
+  const dir = mkdtempSync(join(tmpdir(), "mods-"));
+  const write = (path, text) => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  };
+  write("core/manifest.json", JSON.stringify({ name: "core", files: [{ from: "t/p.json", to: "p.json" }] }));
+  write("core/t/p.json", '{"a":[1]}');
+  write("m/manifest.json", JSON.stringify({ name: "m", files: [{ from: "t/p.json", to: "p.json", merge: true }] }));
+  write("m/t/p.json", '{"a":{"b":1},"c":2}');
+  write("o/manifest.json", JSON.stringify({ name: "o", dependsOn: ["m"], overrides: ["p.json"], files: [{ from: "t/p.json", to: "p.json" }] }));
+  write("o/t/p.json", "{}");
+  const { answers } = validateAnswers({ name: "Demo" });
+  const dest = tmp();
+  render({ modules: resolveModules(["m"], dir), answers, modulesDir: dir, destDir: dest });
+  assert.deepEqual(JSON.parse(readFileSync(join(dest, "p.json"), "utf8")), { a: { b: 1 }, c: 2 });
+  assert.throws(() => render({ modules: resolveModules(["o"], dir), answers, modulesDir: dir, destDir: tmp() }), {
+    message: "o overrides p.json, which m merges into; merge instead",
+  });
+});
+
+test("allow_builds_yaml quotes package names and keeps reasons on one line", () => {
+  const dir = mkdtempSync(join(tmpdir(), "mods-"));
+  mkdirSync(join(dir, "core", "t"), { recursive: true });
+  writeFileSync(join(dir, "core", "t", "w.yaml"), "{{allow_builds_yaml}}\n");
+  writeFileSync(
+    join(dir, "core", "manifest.json"),
+    JSON.stringify({ name: "core", files: [{ from: "t/w.yaml", to: "w.yaml" }], allowBuilds: { "@scope/pkg": { allow: true, reason: "Two\nlines." } } }),
+  );
+  const dest = tmp();
+  const { answers } = validateAnswers({ name: "Demo" });
+  render({ modules: resolveModules([], dir), answers, modulesDir: dir, destDir: dest });
+  assert.equal(readFileSync(join(dest, "w.yaml"), "utf8"), '  # Two lines.\n  "@scope/pkg": true\n');
 });
