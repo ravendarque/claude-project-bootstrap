@@ -23,5 +23,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          zip -qr project-bootstrap.zip .claude-plugin skills LICENSE.md LICENSE-SCHEDULE.md README.md
+          zip -qr project-bootstrap.zip .claude-plugin skills agents hooks LICENSE.md LICENSE-SCHEDULE.md README.md
           gh release upload "$TAG" project-bootstrap.zip --repo "$GITHUB_REPOSITORY" --clobber

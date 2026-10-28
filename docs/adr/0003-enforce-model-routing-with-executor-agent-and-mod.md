@@ -67,6 +67,12 @@ Option 3. The plugin ships:
   desktop app loads the mod and enforces it the same way must be checked by
   hand (steps in the pull request) before this is relied on.
 - The mod can only be shipped by a plugin, so a generated project gets the
-  guidance and an executor agent definition but not the enforcement.
+  guidance but neither the enforcement nor an executor agent. No agent
+  definition is rendered because the executor's content is specific to the
+  bootstrap phases and would not fit an arbitrary project's scripted work.
+- The `.catch` fails open: if the hook breaks, the event passes through
+  unchanged. A broken hook must not block every subagent spawn, at the cost
+  of losing enforcement silently. `claude plugin validate` flags a gating
+  hook without a `.catch`, and reports this one as `gating hook with .catch`.
 - The mods API is versioned with Claude Code and can change between
   releases; revisit this if the `agent.spawn` hook changes.
