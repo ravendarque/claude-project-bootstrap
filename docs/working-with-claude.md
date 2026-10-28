@@ -31,8 +31,9 @@ The bootstrap skill is the scripted case. Its `bootstrap-executor` agent
 (`agents/bootstrap-executor.md`) does scaffolding and its smoke check,
 GitHub configuration and the first-PR mechanics, while the main session
 keeps the interview, the plan, each go-ahead, repository creation and the
-initial push, and the verification. The plugin's routing mod (`hooks/register.js`) forces the
-executor onto Sonnet and refuses a second one while it's active:
+initial push, and the verification. The plugin's routing mod
+(`hooks/register.js`) forces the executor onto Sonnet and refuses a second
+one while it's active:
 [ADR-0003](adr/0003-enforce-model-routing-with-executor-agent-and-mod.md).
 
 ## Memory
