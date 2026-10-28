@@ -1,7 +1,6 @@
 {
   "name": "project-bootstrap",
   "description": "Bootstrap a new project with GitHub workflow, release pipeline, standards and Claude configuration from selectable modules.",
-  "version": "0.1.0",
   "author": { "name": "Ravendarque", "url": "https://github.com/ravendarque" },
   "license": "SEE LICENSE IN LICENSE.md",
   "skills": ["./skills/bootstrap"]
