@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, existsSync, readdirSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { maxSlugLength, resolveModules, validateAnswers, render } from "../skills/bootstrap/scripts/render.mjs";
+import { formatJson, maxSlugLength, resolveModules, validateAnswers, render } from "../skills/bootstrap/scripts/render.mjs";
 
 const modulesDir = fileURLToPath(new URL("./fixtures/modules", import.meta.url));
 const tmp = () => mkdtempSync(join(tmpdir(), "render-"));
@@ -283,4 +283,13 @@ test("allow_builds_yaml quotes package names and keeps reasons on one line", () 
   const { answers } = validateAnswers({ name: "Demo" });
   render({ modules: resolveModules([], dir), answers, modulesDir: dir, destDir: dest });
   assert.equal(readFileSync(join(dest, "w.yaml"), "utf8"), '  # Two lines.\n  "@scope/pkg": true\n');
+});
+
+test("formatJson keeps short scalar arrays on one line and expands objects and long arrays", () => {
+  const long = Array.from({ length: 12 }, (_, i) => `path/number-${i}/`);
+  const out = formatJson({ short: ["a", "b"], empty: [], nested: { n: 1 }, long, items: [{ x: 1 }] });
+  assert.equal(
+    out,
+    `{\n  "short": ["a", "b"],\n  "empty": [],\n  "nested": {\n    "n": 1\n  },\n  "long": [\n${long.map(p => `    "${p}"`).join(",\n")}\n  ],\n  "items": [\n    {\n      "x": 1\n    }\n  ]\n}`,
+  );
 });

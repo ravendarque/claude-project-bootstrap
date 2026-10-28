@@ -29,7 +29,11 @@ function stopServer() {
 }
 
 const BROWSERS = {
-  chrome: { browserName: "chrome", browserVersion: "stable", "goog:chromeOptions": { args: ["--headless=new", "--no-sandbox"] } },
+  chrome: {
+    browserName: "chrome",
+    browserVersion: "stable",
+    "goog:chromeOptions": { args: ["--headless=new", "--no-sandbox"] },
+  },
   firefox: { browserName: "firefox", browserVersion: "stable", "moz:firefoxOptions": { args: ["-headless"] } },
   safari: { browserName: "safari" },
 };
@@ -50,8 +54,9 @@ export const config = {
   reporters: ["spec"],
   mochaOpts: { timeout: 60000 },
   async onPrepare() {
-    if (await answers(BASE_URL)) throw new SevereServiceError(`Something is already serving ${BASE_URL}; stop it first`);
-    server = spawn("pnpm", ["e2e:server"], { stdio: "inherit", detached: true });
+    if (await answers(BASE_URL))
+      throw new SevereServiceError(`Something is already serving ${BASE_URL}; stop it first`);
+    server = spawn("pnpm", ["--silent", "e2e:server"], { stdio: "inherit", detached: true });
     try {
       await waitFor(BASE_URL, 120000);
     } catch (error) {
