@@ -38,7 +38,8 @@ the security features a private repo can't use).
    `gh api -X PUT repos/$R/private-vulnerability-reporting`.
 3. Labels: for each entry in `.bootstrap/github/labels.json`,
    `gh label create "<name>" --repo $R --color <color> --description "<description>"`.
-4. Ruleset (on a free private repo, skip it as the plan said and record it with `state.mjs skip`):
+4. Ruleset (on a free private repo, skip it as the plan said and record it
+   with `state.mjs skip`):
    `gh api -X POST repos/$R/rulesets --input .bootstrap/github/ruleset.json`.
 5. Board. Look for an existing project titled `<name>` first
    (`gh project list --owner <owner> --format json`); create it only if
