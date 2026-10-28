@@ -29,9 +29,11 @@ Options considered:
 Option 3. The plugin ships:
 
 - `agents/bootstrap-executor.md`, a `model: sonnet` agent that does the
-  mechanical phases, never takes a public, paid or irreversible step
-  without the main session stating the user's yes, and reports real
-  command output;
+  mechanical phases (scaffold and its smoke check, GitHub configuration,
+  first-PR mechanics, CI log digging), leaves repository creation and the
+  initial push to the main session, never takes another public, paid or
+  irreversible step without the main session stating the user's yes, and
+  reports real command output;
 - a mod (`hooks/hooks.json` and `hooks/register.js`) whose `agent.spawn`
   hook acts only on a `subagentType` ending in `:bootstrap-executor`. It
   forces the model to Sonnet, overriding the per-call model, and denies the

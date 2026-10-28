@@ -14,12 +14,11 @@ target directory, `$R` is `<owner>/<slug>`.
 
 The main session (this one) keeps the work that needs judgement or the
 user: `preflight`, `interview`, `tools`, `plan-confirmed`, the go-ahead for
-each public or irreversible step, the manual steps with the user,
-verification and `handover`.
+each public or irreversible step, `repo-created` and `initial-push`, the
+manual steps with the user, verification and `handover`.
 
 One `bootstrap-executor` agent does the mechanical phases: `scaffold` and
-its smoke check, `repo-created` and `initial-push` once approved, the GitHub
-configuration, the first-PR mechanics and CI log digging. Brief it with the
+its smoke check, the GitHub configuration, the first-PR mechanics and CI log digging. Brief it with the
 phase, the step ids, `<dir>` and `$R`, the approvals already given, and the
 instruction to run slow commands in the foreground and to report real
 command output. Send follow-ups to the same executor; the plugin's routing
