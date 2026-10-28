@@ -8,9 +8,9 @@ export function isExecutor(subagentType) {
   return typeof subagentType === "string" && subagentType.endsWith(EXECUTOR_SUFFIX);
 }
 
-export function decideSpawn(subagentType, agents) {
+export function decideSpawn(subagentType, agents, reserved = false) {
   if (!isExecutor(subagentType)) return { action: "pass" };
   const occupied = agents.some((a) => isExecutor(a.type) && OCCUPYING.includes(a.status));
-  if (occupied) return { action: "deny", message: DENY_MESSAGE };
+  if (reserved || occupied) return { action: "deny", message: DENY_MESSAGE };
   return { action: "force", model: EXECUTOR_MODEL };
 }

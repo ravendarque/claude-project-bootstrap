@@ -59,6 +59,16 @@ Option 3. The plugin ships:
   an Explore agent passed through untouched; and `$.agent.list()` reports
   `type` and `status`. Matching is on `subagentType`, not on the plugin's
   origin, which differs for an installed plugin.
+- **Race in the single-executor limit, found by the desktop check.** Two
+  executors spawned in parallel in one message both started, because the
+  second hook's `$.agent.list()` ran before the first spawn registered.
+  The headless runs serialised the two calls, so the spike missed it. The
+  hook now holds a module-level reservation, set synchronously before any
+  `await`, denies while it is held, and releases it in a `finally` once
+  `next` settles (by then the agent is registered, so later spawns see it
+  in the list). A spawn the list check denies releases it too. The
+  reservation relies on the module instance persisting across hook calls,
+  which is unverified.
 - **Notice not built.** A `turn.complete` note ("the main session ran a
   mechanical phase itself") was dropped. `tool.call` carries no agent id,
   so the mod cannot tell the main session's commands from the executor's,

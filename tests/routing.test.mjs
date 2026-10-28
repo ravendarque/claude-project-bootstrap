@@ -36,6 +36,11 @@ test("non-executor agents never occupy the slot", () => {
   assert.equal(decideSpawn(EXEC, [{ type: "Explore", status: "running" }]).action, "force");
 });
 
+test("denies while a spawn holds the reservation, even with no active executor", () => {
+  assert.deepEqual(decideSpawn(EXEC, [], true), { action: "deny", message: DENY_MESSAGE });
+  assert.deepEqual(decideSpawn("Explore", [], true), { action: "pass" });
+});
+
 test("deny message points follow-ups at the existing executor", () => {
   assert.match(DENY_MESSAGE, /follow-ups to the existing executor/);
 });
