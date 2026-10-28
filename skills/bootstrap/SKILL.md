@@ -132,9 +132,15 @@ steps count as settled. Before re-running a create:
     project's own process and proves the pipeline.
     - If any selected module has `stage: "app"` files: find or create the
       issue "Initial application" (record `first_issue`), add it to the
-      board if it isn't there (`gh project item-add <number> --owner <owner> --url <issue-url>`),
-      confirm it's listed (`gh project item-list <number> --owner <owner> --format json`),
-      and set it to In Progress with the recorded ids
+      board if it isn't there
+      (`gh project item-add <project_number> --owner <owner> --url <issue-url> --format json --jq .id`)
+      and confirm it's listed
+      (`gh project item-list <project_number> --owner <owner> --format json`).
+      If the issue is already on the board (the built-in auto-add workflow may
+      have added it), take the item id from the `item-list` entry whose
+      content URL matches the issue. Record it
+      (`state.mjs record <dir> first_issue_item <id>`) so a resume can reuse
+      it, then set it to In Progress with the recorded ids
       (`gh project item-edit --id <item-id> --project-id <project_id> --field-id <status_field_id> --single-select-option-id <in_progress_option>`).
       Only then create the branch
       `feature/<n>-initial-app`, render with
