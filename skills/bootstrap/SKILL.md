@@ -28,6 +28,13 @@ need the most capable model. Carry on either way.
   Never ask the user to paste a secret into the conversation.
 - **Pace GitHub mutations**: one at a time, at least a second apart. On a
   rate-limit error, stop, record state and report. Never retry into it.
+- **Retry transient GitHub errors, boundedly.** A 5xx response, or a GraphQL
+  "Something went wrong" error, is transient; a rate limit is not. First
+  check whether the mutation took effect (look the resource up, as under
+  Resuming) so a create that succeeded server-side isn't duplicated. If it
+  didn't, retry at most 3 times, pausing about 5, 15 and 30 seconds, on top
+  of the normal pacing. If it still fails, stop, record state and report
+  the request id (`gh api -i`, or the `X-GitHub-Request-Id` header).
 - **Record every step** as soon as it succeeds:
   `node scripts/state.mjs done <dir> <step-id>`. Record every id a create
   returns (`state.mjs record <dir> <key> <value>`) before the next command.
@@ -124,8 +131,13 @@ steps count as settled. Before re-running a create:
 10. **`first-pr-merged`**: the first user-facing change ships through the
     project's own process and proves the pipeline.
     - If any selected module has `stage: "app"` files: find or create the
-      issue "Initial application" (record `first_issue`), move it to In
-      Progress, branch `feature/<n>-initial-app`, render with
+      issue "Initial application" (record `first_issue`), add it to the
+      board if it isn't there (`gh project item-add <number> --owner <owner> --url <issue-url>`),
+      confirm it's listed (`gh project item-list <number> --owner <owner> --format json`),
+      and set it to In Progress with the recorded ids
+      (`gh project item-edit --id <item-id> --project-id <project_id> --field-id <status_field_id> --single-select-option-id <in_progress_option>`).
+      Only then create the branch
+      `feature/<n>-initial-app`, render with
       `--stage app`, run the scaffold formatting, commit, and open a draft
       PR with `release: minor` set at creation (`gh pr create --draft --label`).
       Mark it ready, wait with `gh pr checks --watch --fail-fast`, and merge
