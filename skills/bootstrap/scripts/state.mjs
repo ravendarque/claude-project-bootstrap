@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { maxSlugLength, resolveModules, validateAnswers } from "./render.mjs";
 
-const EMPTY = { steps: {}, answers: null, modules: [], ids: {} };
+const EMPTY = { steps: {}, answers: null, modules: [], ids: {}, skipped: {} };
 const folder = dir => join(dir, ".bootstrap");
 const file = dir => join(folder(dir), "state.json");
 
@@ -59,7 +59,19 @@ export function saveAnswers(dir, input, modules, modulesDir) {
 
 export function markDone(dir, stepId) {
   const state = loadState(dir);
-  save(dir, { ...state, steps: { ...state.steps, [stepId]: "done" } });
+  const { [stepId]: _cleared, ...skipped } = state.skipped;
+  save(dir, { ...state, steps: { ...state.steps, [stepId]: "done" }, skipped });
+}
+
+export function markSkipped(dir, stepId, reason) {
+  if (typeof reason !== "string" || !reason.trim()) throw new Error("A skipped step needs a reason");
+  const state = loadState(dir);
+  if (state.steps[stepId] === "done") throw new Error(`Step ${stepId} is already done`);
+  save(dir, {
+    ...state,
+    steps: { ...state.steps, [stepId]: "skipped" },
+    skipped: { ...state.skipped, [stepId]: reason.trim() },
+  });
 }
 
 export function recordId(dir, key, value) {
@@ -73,13 +85,14 @@ export function getId(dir, key) {
 
 export function nextStep(dir, orderedStepIds) {
   const { steps } = loadState(dir);
-  return orderedStepIds.find(id => steps[id] !== "done") ?? null;
+  return orderedStepIds.find(id => !["done", "skipped"].includes(steps[id])) ?? null;
 }
 
 const USAGE = `Usage:
   state.mjs show <dir>
   state.mjs save-answers <dir> <answers.json> <modules,comma,separated>
   state.mjs done <dir> <step-id>
+  state.mjs skip <dir> <step-id> <reason...>
   state.mjs next <dir> <step-id,step-id,...>
   state.mjs record <dir> <key> <value>
   state.mjs get <dir> <key>`;
@@ -100,6 +113,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else if (command === "done") {
     need(1);
     markDone(dir, rest[0]);
+  } else if (command === "skip") {
+    need(2);
+    markSkipped(dir, rest[0], rest.slice(1).join(" "));
   } else if (command === "next") {
     need(1);
     console.log(nextStep(dir, rest[0].split(",")) ?? "complete");
