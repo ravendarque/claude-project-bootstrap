@@ -10,7 +10,7 @@ you through the few steps only you can do.
 
 ```
 /plugin marketplace add ravendarque/claude-project-bootstrap
-/plugin install claude-project-bootstrap@claude-project-bootstrap
+/plugin install project-bootstrap@ravendarque
 ```
 
 Each GitHub Release also carries the plugin as a zip.

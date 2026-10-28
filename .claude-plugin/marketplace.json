@@ -1,9 +1,9 @@
 {
-  "name": "claude-project-bootstrap",
+  "name": "ravendarque",
   "owner": { "name": "Ravendarque", "url": "https://github.com/ravendarque" },
   "plugins": [
     {
-      "name": "claude-project-bootstrap",
+      "name": "project-bootstrap",
       "source": "./",
       "description": "Bootstrap a new project with GitHub workflow, release pipeline, standards and Claude configuration from selectable modules."
     }
