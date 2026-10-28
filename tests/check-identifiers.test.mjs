@@ -102,6 +102,12 @@ test("a directory that git ignores is walked rather than silently skipped", need
   assert.deepEqual(hits, [{ file: "a.md", line: 1, match: "forbidden-term" }]);
 });
 
+test("an untracked, non-ignored subdirectory is walked rather than silently skipped", needsGit, () => {
+  const root = repo({ "tracked.md": "clean\n", "scratch/a.md": "forbidden-term\n" }, "");
+  const hits = findIdentifiers(join(root, "scratch"), [/forbidden-term/], []);
+  assert.deepEqual(hits, [{ file: "a.md", line: 1, match: "forbidden-term" }]);
+});
+
 test("outside a git work tree, the directory walk still reports a match", () => {
   const root = tree({ "a.md": "has forbidden-term\n" });
   assert.deepEqual(findIdentifiers(root, [/forbidden-term/], []), [

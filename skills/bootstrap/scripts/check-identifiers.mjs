@@ -28,10 +28,9 @@ function trackedFiles(rootDir) {
   if (git(rootDir, ["rev-parse", "--is-inside-work-tree"])?.trim() !== "true") return null;
   if (git(rootDir, ["check-ignore", "-q", "."]) !== null) return null;
   const listed = git(rootDir, ["ls-files", "-z"]);
-  if (listed === null) return null;
-  return listed
-    .split("\0")
-    .filter(Boolean)
+  const names = (listed ?? "").split("\0").filter(Boolean);
+  if (names.length === 0) return null;
+  return names
     .filter(name => !BINARY.test(name))
     .map(name => join(rootDir, name))
     .filter(path => existsSync(path));
