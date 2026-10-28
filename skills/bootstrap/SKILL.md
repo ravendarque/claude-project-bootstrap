@@ -104,6 +104,9 @@ steps count as settled. Before re-running a create:
      if it's more than six months old;
    - that the initial commit is pushed straight to `main` once, before
      protections exist, and never again.
+   - for a public repo, that Claude Code's permission checks may block
+     creating it even after this yes, and that the user will be asked to
+     confirm that step again at `repo-created`.
 5. **`scaffold`**: `git init -b main`, then set the project's commit
    identity to the user's GitHub login and noreply address, so no personal
    name or address reaches a public history:
@@ -120,6 +123,11 @@ steps count as settled. Before re-running a create:
    module's smoke check there, so the first PR will be green. Fix template
    defects in the plugin, not by hand in the project.
 6. **`repo-created`**: `gh repo create $R --<visibility> --source <dir> --remote origin --description "<description>"`.
+   Creating a public repo may be blocked by the harness's permission
+   checks even though `plan-confirmed` was a yes. That block is expected,
+   not a failure. Ask the user to confirm this step in the running session,
+   and run it only after they do. Never work around the block: no other
+   command, no nested session, no other way of making the repo public.
 7. **`initial-push`**: if `git log` shows no commit yet, commit (signed);
    then `git push -u origin main`.
 8. **GitHub configuration**: each selected module's section 4, in module
