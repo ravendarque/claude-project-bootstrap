@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,9 +16,29 @@ function* walk(dir) {
   }
 }
 
+function git(rootDir, args) {
+  try {
+    return execFileSync("git", args, { cwd: rootDir, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }).toString();
+  } catch {
+    return null;
+  }
+}
+
+function trackedFiles(rootDir) {
+  if (git(rootDir, ["rev-parse", "--is-inside-work-tree"])?.trim() !== "true") return null;
+  if (git(rootDir, ["check-ignore", "-q", "."]) !== null) return null;
+  const listed = git(rootDir, ["ls-files", "-z"]);
+  const names = (listed ?? "").split("\0").filter(Boolean);
+  if (names.length === 0) return null;
+  return names
+    .filter(name => !BINARY.test(name))
+    .map(name => join(rootDir, name))
+    .filter(path => existsSync(path));
+}
+
 export function findIdentifiers(rootDir, patterns, allow) {
   const hits = [];
-  for (const path of walk(rootDir)) {
+  for (const path of trackedFiles(rootDir) ?? walk(rootDir)) {
     const file = relative(rootDir, path);
     readFileSync(path, "utf8")
       .split("\n")
