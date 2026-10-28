@@ -1,0 +1,2 @@
+{ "name": "pkgbase", "dependsOn": [], "files": [{ "from": "templates/package.json", "to": "package.json" }],
+  "allowBuilds": { "esbuild": { "allow": true, "reason": "Bundler binary." } } }

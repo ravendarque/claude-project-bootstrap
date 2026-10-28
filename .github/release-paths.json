@@ -4,7 +4,9 @@
     ".github/",
     ".claude/",
     ".gitignore",
-    "*.md"
+    "*.md",
+    "tests/",
+    "package.json"
   ],
   "noneForbidden": []
 }

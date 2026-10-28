@@ -1,0 +1,4 @@
+{ "name": "e", "dependsOn": [], "files": [
+  { "from": "templates/infra.txt", "to": "infra.txt" },
+  { "from": "templates/app.txt", "to": "src/app.txt", "stage": "app" }
+], "requiredChecks": [], "claudeIndexLines": [] }

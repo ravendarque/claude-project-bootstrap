@@ -1,0 +1,6 @@
+[
+  { "name": "release: major", "color": "b60205", "description": "Breaking change: next release bumps the major version" },
+  { "name": "release: minor", "color": "0e8a16", "description": "New capability: next release bumps the minor version" },
+  { "name": "release: patch", "color": "1d76db", "description": "Fix or polish: next release bumps the patch version" },
+  { "name": "release: none", "color": "cccccc", "description": "Never reaches users: no release" }
+]

@@ -1,0 +1,27 @@
+name: Release artefacts
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - name: Zip and attach the plugin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip -qr claude-project-bootstrap.zip .claude-plugin skills LICENSE.md LICENSE-SCHEDULE.md README.md
+          gh release upload "$TAG" claude-project-bootstrap.zip --repo "$GITHUB_REPOSITORY" --clobber

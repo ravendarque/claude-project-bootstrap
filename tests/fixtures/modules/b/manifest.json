@@ -1,0 +1,7 @@
+{
+  "name": "b",
+  "dependsOn": ["a"],
+  "files": [{ "from": "templates/b.txt", "to": "../escape.txt" }],
+  "requiredChecks": ["lint", "test"],
+  "claudeIndexLines": []
+}

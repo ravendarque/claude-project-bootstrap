@@ -1,0 +1,1 @@
+{ "name": "orphan", "dependsOn": [], "files": [{ "from": "templates/package.json", "to": "package.json", "merge": true }] }

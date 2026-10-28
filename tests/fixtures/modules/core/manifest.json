@@ -1,0 +1,32 @@
+{
+  "name": "core",
+  "dependsOn": [],
+  "files": [
+    {
+      "from": "templates/CLAUDE.md",
+      "to": "CLAUDE.md"
+    },
+    {
+      "from": "templates/docs/beta.md",
+      "to": "docs/beta.md",
+      "when": "beta"
+    },
+    {
+      "from": "templates/docs/no-beta.md",
+      "to": "docs/no-beta.md",
+      "when": "!beta"
+    }
+  ],
+  "requiredChecks": [
+    "check-label"
+  ],
+  "claudeIndexLines": [
+    "- Core line"
+  ],
+  "releasePaths": {
+    "noneAllowed": [
+      "docs/"
+    ],
+    "noneForbidden": []
+  }
+}

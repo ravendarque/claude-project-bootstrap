@@ -1,0 +1,104 @@
+{
+  "name": "js-toolchain",
+  "dependsOn": [],
+  "questions": [],
+  "overrides": [
+    ".github/dependabot.yml"
+  ],
+  "files": [
+    {
+      "from": "templates/package.json",
+      "to": "package.json"
+    },
+    {
+      "from": "templates/pnpm-workspace.yaml",
+      "to": "pnpm-workspace.yaml"
+    },
+    {
+      "from": "templates/npmrc",
+      "to": ".npmrc"
+    },
+    {
+      "from": "templates/biome.json",
+      "to": "biome.json"
+    },
+    {
+      "from": "templates/tsconfig.json",
+      "to": "tsconfig.json"
+    },
+    {
+      "from": "templates/vitest.config.js",
+      "to": "vitest.config.js"
+    },
+    {
+      "from": "templates/github/actions/setup-node-pnpm/action.yml",
+      "to": ".github/actions/setup-node-pnpm/action.yml"
+    },
+    {
+      "from": "templates/github/workflows/test.yml",
+      "to": ".github/workflows/test.yml"
+    },
+    {
+      "from": "templates/github/dependabot.yml",
+      "to": ".github/dependabot.yml"
+    },
+    {
+      "from": "templates/src/greeting.js",
+      "to": "src/greeting.js",
+      "stage": "app"
+    },
+    {
+      "from": "templates/test/greeting.test.js",
+      "to": "test/greeting.test.js",
+      "stage": "app"
+    }
+  ],
+  "requiredChecks": [
+    "lint",
+    "typecheck",
+    "test"
+  ],
+  "releasePaths": {
+    "noneAllowed": [
+      "test/",
+      "biome.json",
+      "vitest.config.js"
+    ],
+    "noneForbidden": []
+  },
+  "claudeIndexLines": [
+    "- JavaScript with pnpm, Biome, `tsc` over JSDoc and Vitest: [coding standards](docs/coding-standards.md#javascript-toolchain). Run `pnpm lint && pnpm typecheck && pnpm test` before pushing."
+  ],
+  "screening": [
+    {
+      "dependency": "pnpm",
+      "maintainer": "pnpm project (independent open source)",
+      "listed": "N",
+      "note": ""
+    },
+    {
+      "dependency": "Vitest",
+      "maintainer": "VoidZero Inc.",
+      "listed": "N",
+      "note": ""
+    },
+    {
+      "dependency": "Biome",
+      "maintainer": "Biome project (independent open source)",
+      "listed": "N",
+      "note": ""
+    },
+    {
+      "dependency": "TypeScript (`tsc`)",
+      "maintainer": "Microsoft",
+      "listed": "Y",
+      "note": "Free, dev-only, no maintained non-Microsoft JavaScript type checker: allowed under the free-tool exception."
+    }
+  ],
+  "allowBuilds": {
+    "esbuild": {
+      "allow": true,
+      "reason": "Vitest's bundler ships its platform binary through an install script."
+    }
+  }
+}

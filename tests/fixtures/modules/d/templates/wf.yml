@@ -1,0 +1,3 @@
+name: {{name}}
+ref: ${{ github.sha }}
+ctx: ${{ steps }}

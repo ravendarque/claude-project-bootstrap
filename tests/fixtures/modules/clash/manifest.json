@@ -1,0 +1,1 @@
+{"name":"clash","dependsOn":[],"files":[{"from":"templates/x","to":"a"},{"from":"templates/x","to":"a/b"}]}

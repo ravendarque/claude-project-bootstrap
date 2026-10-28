@@ -1,0 +1,157 @@
+{
+  "name": "cloudflare-opentofu",
+  "dependsOn": [
+    "web-app"
+  ],
+  "maxSlugLength": 40,
+  "questions": [
+    {
+      "key": "zone_name",
+      "type": "hostname",
+      "prompt": "Which domain (Cloudflare zone) will the app be served from?"
+    },
+    {
+      "key": "beta",
+      "type": "boolean",
+      "prompt": "Do you want a beta environment, with releases deployed to beta first and promoted to production by hand?"
+    }
+  ],
+  "overrides": [],
+  "files": [
+    {
+      "from": "templates/package.json",
+      "to": "package.json",
+      "merge": true
+    },
+    {
+      "from": "templates/wrangler-beta.jsonc",
+      "to": "wrangler.jsonc",
+      "when": "beta"
+    },
+    {
+      "from": "templates/wrangler.jsonc",
+      "to": "wrangler.jsonc",
+      "when": "!beta"
+    },
+    {
+      "from": "templates/dev.vars.example",
+      "to": ".dev.vars.example"
+    },
+    {
+      "from": "templates/infra/main.tf",
+      "to": "infra/main.tf"
+    },
+    {
+      "from": "templates/infra/variables.tf",
+      "to": "infra/variables.tf"
+    },
+    {
+      "from": "templates/infra/outputs.tf",
+      "to": "infra/outputs.tf"
+    },
+    {
+      "from": "templates/infra/dns.tf",
+      "to": "infra/dns.tf"
+    },
+    {
+      "from": "templates/infra/dns-beta.tf",
+      "to": "infra/dns-beta.tf",
+      "when": "beta"
+    },
+    {
+      "from": "templates/infra/security.tf",
+      "to": "infra/security.tf"
+    },
+    {
+      "from": "templates/infra/cache.tf",
+      "to": "infra/cache.tf"
+    },
+    {
+      "from": "templates/infra/terraform.tfvars.example",
+      "to": "infra/terraform.tfvars.example"
+    },
+    {
+      "from": "templates/infra/README.md",
+      "to": "infra/README.md"
+    },
+    {
+      "from": "templates/scripts/bootstrap-state.mjs",
+      "to": "scripts/bootstrap-state.mjs"
+    },
+    {
+      "from": "templates/github/workflows/infra.yml",
+      "to": ".github/workflows/infra.yml"
+    },
+    {
+      "from": "templates/github/workflows/bootstrap-state.yml",
+      "to": ".github/workflows/bootstrap-state.yml"
+    },
+    {
+      "from": "templates/github/workflows/preview.yml",
+      "to": ".github/workflows/preview.yml"
+    },
+    {
+      "from": "templates/github/workflows/deploy-beta.yml",
+      "to": ".github/workflows/deploy.yml",
+      "when": "beta"
+    },
+    {
+      "from": "templates/github/workflows/deploy.yml",
+      "to": ".github/workflows/deploy.yml",
+      "when": "!beta"
+    },
+    {
+      "from": "templates/github/workflows/promote.yml",
+      "to": ".github/workflows/promote.yml",
+      "when": "beta"
+    },
+    {
+      "from": "templates/src/worker.js",
+      "to": "src/worker.js",
+      "stage": "app"
+    },
+    {
+      "from": "templates/test/worker.test.js",
+      "to": "test/worker.test.js",
+      "stage": "app"
+    }
+  ],
+  "requiredChecks": [],
+  "releasePaths": {
+    "noneAllowed": [],
+    "noneForbidden": [
+      "infra/",
+      "migrations/",
+      "wrangler.jsonc"
+    ]
+  },
+  "claudeIndexLines": [
+    "- Cloudflare Workers, deployed by wrangler from release tags; infrastructure in OpenTofu: [coding standards](docs/coding-standards.md#cloudflare-and-opentofu), [infra](infra/README.md). Merging `infra/` is a production change."
+  ],
+  "screening": [
+    {
+      "dependency": "Cloudflare (hosting, DNS, R2)",
+      "maintainer": "Cloudflare, Inc.",
+      "listed": "N",
+      "note": ""
+    },
+    {
+      "dependency": "wrangler",
+      "maintainer": "Cloudflare, Inc.",
+      "listed": "N",
+      "note": ""
+    },
+    {
+      "dependency": "OpenTofu",
+      "maintainer": "OpenTofu project (Linux Foundation)",
+      "listed": "N",
+      "note": "Chosen over Terraform, whose owner IBM is a No Tech for Apartheid target."
+    }
+  ],
+  "allowBuilds": {
+    "workerd": {
+      "allow": true,
+      "reason": "wrangler's local runtime downloads its platform binary at install."
+    }
+  }
+}
