@@ -4,8 +4,8 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getId, loadState, markDone, markSkipped, nextStep, recordId, saveAnswers, saveRun } from "../skills/bootstrap/scripts/state.mjs";
 import { fileURLToPath } from "node:url";
+import { getId, loadState, markDone, markSkipped, nextStep, recordId, saveAnswers, saveRun } from "../skills/bootstrap/scripts/state.mjs";
 import { realModulesDir } from "./helpers.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "state-"));
@@ -166,4 +166,21 @@ test("the skip command exits 2 without a reason", () => {
   const result = cli("skip", tmp(), "interview");
   assert.equal(result.status, 2);
   assert.match(result.stderr, /state\.mjs skip/);
+});
+
+test("the skip command exits 2 for an empty or blank reason", () => {
+  for (const reason of ["", "  "]) {
+    const result = cli("skip", tmp(), "interview", reason);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /state\.mjs skip/);
+  }
+});
+
+test("the skip command reports a done step as a plain error and exits 1", () => {
+  const dir = tmp();
+  markDone(dir, "preflight");
+  const result = cli("skip", dir, "preflight", "changed my mind");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /already done/);
+  assert.doesNotMatch(result.stderr, /\n\s+at /);
 });

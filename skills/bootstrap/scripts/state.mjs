@@ -115,7 +115,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     markDone(dir, rest[0]);
   } else if (command === "skip") {
     need(2);
-    markSkipped(dir, rest[0], rest.slice(1).join(" "));
+    const reason = rest.slice(1).join(" ").trim();
+    if (!reason) {
+      console.error(USAGE);
+      process.exit(2);
+    }
+    try {
+      markSkipped(dir, rest[0], reason);
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
   } else if (command === "next") {
     need(1);
     console.log(nextStep(dir, rest[0].split(",")) ?? "complete");

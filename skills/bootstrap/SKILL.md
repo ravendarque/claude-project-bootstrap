@@ -46,7 +46,7 @@ load the selected modules' MODULE.md files and continue from
 `state.mjs next <dir> <ids>`, with the step ids below in order. Skipped
 steps count as settled. Before re-running a create:
 
-- if the resource has a recorded id (`state.mjs get`), it exists: skip it;
+- if the resource has a recorded id (`state.mjs get`), it exists: don't re-create it, and mark the step done;
 - a create that fails with "already exists" (labels, ruleset name,
   environments) counts as done;
 - `repo-created`: if `gh repo view $R` succeeds, add `origin` if
