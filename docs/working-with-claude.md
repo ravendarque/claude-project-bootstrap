@@ -5,27 +5,36 @@ spending tokens on work that doesn't need the most capable model.
 
 ## Model routing
 
+Subagents for scripted work, sessions for open-ended work.
+
 - **The main session runs an Opus-class model.** It owns design, scoping
   issues, architecture decisions, review judgement, anything security- or
   privacy-sensitive, and the final verification before anything is called
   done.
-- **At most one nested Sonnet-class session at a time** takes the work that
-  doesn't need Opus: dependency bumps, running test suites and reporting
+- **Scripted work goes to at most one Sonnet-class subagent at a time**
+  (`model: sonnet`): dependency bumps, running test suites and reporting
   their output, board and label housekeeping, executing an agreed plan step
   by step, bulk renames, doc updates from a settled decision, and digging
   through CI logs.
-- **Follow-ups go to the existing nested session**, not a new one.
-- **The nested session gets its own worktree whenever it writes code**, and
-  the two sessions never write the same files.
+- **Open-ended work gets its own session**: anything that needs a decision
+  along the way, a long-running investigation or its own branch and PR.
+- **Follow-ups go to the existing subagent**, not a new one.
+- **A subagent gets its own worktree whenever it writes code**, and it and
+  the main session never write the same files.
 - **Briefs are self-contained**: the files involved, what done looks like,
   and the instruction to run slow commands (test suites, e2e) in the
   foreground, never in the background.
-- **The main session checks the nested session's results** (the diff, the
-  real test output) before reporting them as done.
+- **The main session checks the subagent's results** (the diff, the real
+  test output) before reporting them as done.
 
-Where nested sessions aren't available (the CLI, the web), use at most one
-subagent with `model: sonnet` at a time, with the same split and the same
-rules.
+The bootstrap skill is the scripted case. Its `bootstrap-executor` agent
+(`agents/bootstrap-executor.md`) does scaffolding and its smoke check,
+GitHub configuration and the first-PR mechanics, while the main session
+keeps the interview, the plan, each go-ahead, repository creation and the
+initial push, and the verification. The plugin's routing mod
+(`hooks/register.js`) forces the executor onto Sonnet and refuses a second
+one while it's active:
+[ADR-0003](adr/0003-enforce-model-routing-with-executor-agent-and-mod.md).
 
 ## Memory
 

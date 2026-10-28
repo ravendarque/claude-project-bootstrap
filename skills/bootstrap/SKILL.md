@@ -10,11 +10,23 @@ first change through its own process. Work the phases in order. The scripts
 are in `scripts/` next to this file; run them with `node`. `<dir>` is the
 target directory, `$R` is `<owner>/<slug>`.
 
-## Before you start
+## Routing
 
-In your first message, suggest the user switches this session to a
-Sonnet-class model: the run follows a settled plan step by step and doesn't
-need the most capable model. Carry on either way.
+The main session (this one) keeps the work that needs judgement or the
+user: `preflight`, `interview`, `tools`, `plan-confirmed`, the go-ahead for
+each public or irreversible step, `repo-created` and `initial-push`, the
+manual steps with the user, verification and `handover`.
+
+One `bootstrap-executor` agent does the mechanical phases: `scaffold` and
+its smoke check, the GitHub configuration, the first-PR mechanics and CI
+log digging. Brief it with the phase, the step ids, `<dir>` and `$R`, the
+approvals already given, and the instruction to run slow commands in the
+foreground and to report real command output. Send follow-ups to the same
+executor; the plugin's routing mod runs it on Sonnet and refuses a second
+one while it's active.
+
+Check its report against real output (`state.mjs show`, `gh`, `git log`)
+before marking a step done or telling the user it worked.
 
 ## Rules for the whole run
 

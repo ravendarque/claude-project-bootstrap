@@ -28,6 +28,6 @@ Read a doc when the work touches it, not up front.
 
 ## Working with Claude
 
-- An Opus-class main session plans, decides and verifies; at most one Sonnet-class nested session does the mechanical work: [working with Claude](docs/working-with-claude.md).
+- An Opus-class main session plans, decides and verifies; at most one Sonnet-class subagent does the scripted work, and open-ended work gets its own session: [working with Claude](docs/working-with-claude.md).
 - Memory is one fact per file with `MEMORY.md` as the index: [working with Claude](docs/working-with-claude.md#memory).
 {{claude_stack_section}}
