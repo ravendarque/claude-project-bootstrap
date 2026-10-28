@@ -31,6 +31,10 @@ need the most capable model. Carry on either way.
 - **Record every step** as soon as it succeeds:
   `node scripts/state.mjs done <dir> <step-id>`. Record every id a create
   returns (`state.mjs record <dir> <key> <value>`) before the next command.
+- **Record a deliberately skipped step** with
+  `node scripts/state.mjs skip <dir> <step-id> <reason>`: a step the plan
+  says to skip on a free private repo, or one the user declines. Never mark
+  a skipped step done.
 - Write generated text in British English and a professional register.
   Never put a real name, email address or personal detail in any file.
 
@@ -39,10 +43,11 @@ need the most capable model. Carry on either way.
 `node scripts/preflight.mjs <dir>` answers `"resume": true` when
 `.bootstrap/state.json` exists. Then read state (`state.mjs show <dir>`),
 load the selected modules' MODULE.md files and continue from
-`state.mjs next <dir> <ids>`, with the step ids below in order. Before
-re-running a create:
+`state.mjs next <dir> <ids>`, with the step ids below in order. Skipped
+steps count as settled. Before re-running a create:
 
-- if the resource has a recorded id (`state.mjs get`), it exists: skip it;
+- if the resource has a recorded id (`state.mjs get`), it exists: don't
+  re-create it, and mark the step done;
 - a create that fails with "already exists" (labels, ruleset name,
   environments) counts as done;
 - `repo-created`: if `gh repo view $R` succeeds, add `origin` if
@@ -131,7 +136,8 @@ re-running a create:
       Say the pipeline is unproven until the first real change, and mark the
       step done.
 11. **`handover`**: summarise what exists, what was verified and how, what
-    was skipped (and why), and every listed screening row. Leave
+    was skipped (list the skipped steps and their reasons from
+    `state.mjs show`), and every listed screening row. Leave
     `.bootstrap/` in place (it's gitignored).
 
 ## When something fails

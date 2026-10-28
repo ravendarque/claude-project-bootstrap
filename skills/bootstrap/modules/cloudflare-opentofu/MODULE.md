@@ -52,7 +52,8 @@ and preview hostnames are built from it.
 
 After core's configuration. Steps `github:cloudflare-opentofu:<n>`.
 Environments need a paid plan on a free private repo: skip them there, as
-the plan said, and set the secrets at repository level instead.
+the plan said, record each skipped step with `state.mjs skip`, and set the
+secrets at repository level instead.
 
 1. Environments, each limited to the refs that may deploy from it:
    - `infra`: the `main` branch only;
