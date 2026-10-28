@@ -17,6 +17,8 @@ jobs:
         with:
           node-version: 22
       - run: npm test
+      - name: Validate plugin manifests
+        run: npx --yes @anthropic-ai/claude-code@2.1.310 plugin validate .
       - name: Identifier guard
         env:
           IDENTIFIER_DENYLIST: ${{ secrets.IDENTIFIER_DENYLIST }}
