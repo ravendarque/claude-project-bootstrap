@@ -1,0 +1,4 @@
+{
+  "description": "Routing enforcement: one Sonnet bootstrap-executor at a time",
+  "modules": ["./register.js"]
+}
