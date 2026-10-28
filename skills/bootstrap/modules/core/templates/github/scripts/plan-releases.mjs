@@ -40,7 +40,9 @@ function isAncestor(git, ancestor, descendant) {
 export function planFromRepo({ git, prFor, mergeSha, bumpInput }) {
   const latestTag = git(["tag", "-l", "v*", "--sort=-v:refname"]).split("\n")[0] || null;
   if (bumpInput) {
-    const existing = git(["tag", "--points-at", "HEAD"]).split("\n").find(tag => /^v\d+\.\d+\.\d+$/.test(tag));
+    const existing = git(["tag", "--points-at", "HEAD"])
+      .split("\n")
+      .find(tag => /^v\d+\.\d+\.\d+$/.test(tag));
     if (existing) throw new Error(`HEAD is already released as ${existing}`);
     return [{ sha: git(["rev-parse", "HEAD"]), version: nextVersion(latestTag, bumpInput), pr: null }];
   }

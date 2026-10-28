@@ -17,6 +17,14 @@ jobs:
         with:
           node-version: 22
       - run: npm test
+      - name: Rendered templates are Biome-formatted
+        run: |
+          dir="$(mktemp -d)"
+          printf '%s' '{"name":"Sample Project","description":"A sample project.","owner":"sample-owner","visibility":"public","zone_name":"example.com","beta":true}' > "$dir/answers.json"
+          node skills/bootstrap/scripts/render.mjs --modules core,js-toolchain,web-app,cloudflare-opentofu --answers "$dir/answers.json" --dest "$dir/project"
+          spec="$(node -p 'require(process.argv[1]).devDependencies["@biomejs/biome"]' "$dir/project/package.json")"
+          cd "$dir/project"
+          npx --yes "@biomejs/biome@$spec" format .
       - name: Validate plugin manifests
         run: npx --yes @anthropic-ai/claude-code@2.1.310 plugin validate .
       - name: Identifier guard

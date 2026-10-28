@@ -6,14 +6,10 @@
     "strict": false,
     "strictNullChecks": true,
     "target": "ES2023",
-    "lib": [
-      "ES2024"
-    ],
+    "lib": ["ES2024"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "skipLibCheck": true
   },
-  "include": [
-    "src/**/*.js"
-  ]
+  "include": ["src/**/*.js"]
 }

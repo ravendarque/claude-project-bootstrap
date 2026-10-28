@@ -23,7 +23,9 @@ None.
   billed at ten times the Linux rate on private ones),
   `.github/workflows/release-artefacts.yml` (when a release is published,
   builds it and attaches `dist/` as `<slug>-dist.zip`),
-  `.claude/launch.json`.
+  `.claude/launch.json`. `wdio.conf.js` starts the server with
+  `pnpm --silent e2e:server`, because stopping it after the run otherwise
+  makes pnpm print `[ELIFECYCLE] Command failed.` on a passing run.
 - Application (first PR, `stage: app`): `index.html`, `src/main.js`,
   `e2e/home.spec.js`.
 

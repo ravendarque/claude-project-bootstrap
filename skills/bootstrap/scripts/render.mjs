@@ -95,6 +95,24 @@ function allowBuildsYaml(modules) {
     .join("\n");
 }
 
+const JSON_LINE_WIDTH = 120;
+
+export function formatJson(value, indent = "") {
+  const inner = `${indent}  `;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    const flat = `[${value.map(item => JSON.stringify(item)).join(", ")}]`;
+    if (value.every(item => typeof item !== "object" || item === null) && indent.length + flat.length < JSON_LINE_WIDTH) return flat;
+    return `[\n${value.map(item => inner + formatJson(item, inner)).join(",\n")}\n${indent}]`;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return "{}";
+    return `{\n${entries.map(([key, item]) => `${inner}${JSON.stringify(key)}: ${formatJson(item, inner)}`).join(",\n")}\n${indent}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function deepMerge(base, extra) {
   const merged = { ...base };
   for (const [key, value] of Object.entries(extra)) {
@@ -124,14 +142,10 @@ function deriveKeys(modules, answers, modulesDir) {
     coding_standards_modules: standardsFragments(modules, modulesDir),
     screening_table: screeningTable(modules),
     allow_builds_yaml: allowBuildsYaml(modules),
-    release_paths_json: JSON.stringify(
-      {
-        noneAllowed: [...new Set(modules.flatMap(m => m.releasePaths?.noneAllowed ?? []))],
-        noneForbidden: [...new Set(modules.flatMap(m => m.releasePaths?.noneForbidden ?? []))],
-      },
-      null,
-      2,
-    ),
+    release_paths_json: formatJson({
+      noneAllowed: [...new Set(modules.flatMap(m => m.releasePaths?.noneAllowed ?? []))],
+      noneForbidden: [...new Set(modules.flatMap(m => m.releasePaths?.noneForbidden ?? []))],
+    }),
     ...(answers.owner && { repo_url: `https://github.com/${answers.owner}/${answers.slug}` }),
   };
 }
@@ -172,7 +186,7 @@ export function render({ modules, answers, modulesDir, destDir, dryRun = false, 
       const owner = owners.get(rel);
       if (file.merge) {
         if (!owner) throw new Error(`${module.name} merges into ${rel}, but no earlier module writes it`);
-        outputs.set(rel, `${JSON.stringify(deepMerge(JSON.parse(outputs.get(rel)), JSON.parse(content)), null, 2)}\n`);
+        outputs.set(rel, `${formatJson(deepMerge(JSON.parse(outputs.get(rel)), JSON.parse(content)))}\n`);
         mergers.set(rel, module.name);
         continue;
       }
