@@ -49,14 +49,26 @@ export function planFromRepo({ git, prFor, mergeSha, bumpInput }) {
   if (latestTag && !isAncestor(git, latestTag, mergeSha)) {
     throw new Error(`${latestTag} isn't in ${mergeSha}'s history, so there's no safe range to release from`);
   }
-  const range = latestTag ? `${latestTag}..${mergeSha}` : mergeSha;
-  const commits = git(["rev-list", "--reverse", "--first-parent", range]).split("\n").filter(Boolean);
+  const commits = latestTag
+    ? git(["rev-list", "--reverse", "--first-parent", `${latestTag}..${mergeSha}`])
+        .split("\n")
+        .filter(Boolean)
+    : [mergeSha];
   return planReleases({
     commits,
     latestVersion: latestTag,
     isTagged: sha => git(["tag", "--points-at", sha]) !== "",
     prFor,
   });
+}
+
+export function parsePulls(output, sha) {
+  try {
+    const pulls = JSON.parse(output);
+    if (Array.isArray(pulls)) return pulls;
+  } catch {}
+  const shown = output.length > 500 ? `${output.slice(0, 500)}...` : output;
+  throw new Error(`gh api returned no usable pull request list for ${sha}: ${JSON.stringify(shown)}`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -67,7 +79,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     mergeSha: MERGE_SHA,
     bumpInput: BUMP_INPUT,
     prFor: sha => {
-      const prs = JSON.parse(run("gh", ["api", `repos/${GITHUB_REPOSITORY}/commits/${sha}/pulls`]));
+      const prs = parsePulls(run("gh", ["api", `repos/${GITHUB_REPOSITORY}/commits/${sha}/pulls`]), sha);
       const pr = prs.find(p => p.merge_commit_sha === sha);
       return pr ? { number: pr.number, labels: pr.labels.map(l => l.name) } : null;
     },
