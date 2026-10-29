@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   bumpOf,
   nextVersion,
+  parsePulls,
   planFromRepo,
   planReleases,
 } from "../skills/bootstrap/modules/core/templates/github/scripts/plan-releases.mjs";
@@ -70,11 +71,39 @@ test("planFromRepo plans from the latest tag to the merge commit", () => {
   assert.ok(calls.includes("rev-list --reverse --first-parent v2.9.5..b"));
 });
 
-test("planFromRepo with no tags walks the merge commit's whole first-parent history", () => {
-  const { git, calls } = fakeGit({ tags: "", revList: "b" });
-  const result = planFromRepo({ git, prFor: sha => PRS[sha] ?? null, mergeSha: "b" });
-  assert.deepEqual(result.map(r => r.version), ["v0.1.0"]);
-  assert.ok(calls.includes("rev-list --reverse --first-parent b"));
+test("planFromRepo with no tags plans the merge commit only", () => {
+  const { git, calls } = fakeGit({ tags: "", revList: "a\nb" });
+  const asked = [];
+  const result = planFromRepo({
+    git,
+    prFor: sha => {
+      asked.push(sha);
+      return PRS[sha] ?? null;
+    },
+    mergeSha: "b",
+  });
+  assert.deepEqual(result, [{ sha: "b", version: "v0.1.0", pr: 2 }]);
+  assert.deepEqual(asked, ["b"]);
+  assert.ok(!calls.some(call => call.startsWith("rev-list")));
+});
+
+test("planFromRepo with no tags and no bump label plans nothing", () => {
+  const { git } = fakeGit({ tags: "" });
+  assert.deepEqual(planFromRepo({ git, prFor: sha => PRS[sha] ?? null, mergeSha: "c" }), []);
+});
+
+test("parsePulls returns the parsed list", () => {
+  assert.deepEqual(parsePulls("[]", "abc"), []);
+});
+
+test("parsePulls throws naming the sha on empty or non-JSON output", () => {
+  assert.throws(() => parsePulls("", "abc123"), /abc123.*""/);
+  assert.throws(() => parsePulls("not json", "abc123"), /abc123.*not json/);
+  assert.throws(() => parsePulls('{"message":"x"}', "abc123"), /abc123/);
+});
+
+test("parsePulls truncates long output", () => {
+  assert.throws(() => parsePulls("x".repeat(2000), "abc123"), err => err.message.length < 700);
 });
 
 test("planFromRepo refuses when the latest tag isn't in the merge commit's history", () => {
