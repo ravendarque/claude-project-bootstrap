@@ -74,7 +74,10 @@ workflows, so releases (and deploys) would never fire.
 1. GitHub → Settings → Developer settings → GitHub Apps → New GitHub App.
 2. Name: `<slug>-release`. Homepage URL: the repository URL. Untick
    Webhook → Active.
-3. Repository permissions: Contents → Read and write. Nothing else.
+3. Repository permissions: Contents → Read and write, and Workflows → Read
+   and write. Nothing else. (GitHub refuses to create a tag when the tagged
+   commit's workflow files differ from the default branch's, unless the
+   App has Workflows.)
 4. "Where can this GitHub App be installed?": Only on this account.
 5. Create it, note the Client ID, then Generate a private key (a `.pem`
    downloads).
