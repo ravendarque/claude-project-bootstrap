@@ -39,6 +39,7 @@ A run can stop and resume: progress is kept in `.bootstrap/state.json`.
 |---|---|
 | `core` (always) | Workflow, versioning and release labels, tag-based releases, coding standards, definition of done, privacy, record of processing, threat model, ADRs, incident runbooks, security policy, licence, Claude configuration, GitHub rulesets, board and security workflows |
 | `js-toolchain` | Any JavaScript project: pnpm with supply-chain controls, Biome, `tsc` over JSDoc, Vitest |
+| `python-toolchain` | Any Python project, as the alternative to `js-toolchain` (one stack per repo): mise-pinned tools, uv with a lockfile, ruff, pytest, and a `mise run check` that is exactly what CI runs |
 | `web-app` | A browser app: Vite, and WebdriverIO end-to-end tests in Chromium and Firefox with axe-core accessibility checks |
 | `cloudflare-opentofu` | A Cloudflare Worker deployed from release tags, optional beta environment with promotion, PR previews, and the zone's DNS, TLS, headers and cache rules in OpenTofu |
 

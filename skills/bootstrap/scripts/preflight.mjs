@@ -57,6 +57,19 @@ const TOOLS = {
     },
     { tool: "pnpm", check: () => ok(run("pnpm", ["--version"])), fix: "Run `corepack enable pnpm` or install pnpm" },
   ],
+  "python-toolchain": [
+    {
+      tool: "mise",
+      check: () => ok(run("mise", ["--version"])),
+      fix: "Install mise (https://mise.jdx.dev/installing-mise.html); it installs uv and shellcheck for the project",
+    },
+    {
+      tool: "gpg",
+      check: () => ok(run("gpg", ["--version"])),
+      fix: "Install gpg (the scaffold uses it to verify mise's signed checksum list)",
+    },
+    { tool: "curl", check: () => ok(run("curl", ["--version"])), fix: "Install curl" },
+  ],
   "cloudflare-opentofu": [
     { tool: "tofu", check: () => ok(run("tofu", ["version"])), fix: "Install OpenTofu (https://opentofu.org/docs/intro/install/)" },
     {

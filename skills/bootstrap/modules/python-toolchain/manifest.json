@@ -1,0 +1,126 @@
+{
+  "name": "python-toolchain",
+  "dependsOn": [],
+  "conflictsWith": [
+    "js-toolchain"
+  ],
+  "questions": [],
+  "overrides": [
+    ".github/dependabot.yml"
+  ],
+  "files": [
+    {
+      "from": "templates/mise.toml",
+      "to": "mise.toml"
+    },
+    {
+      "from": "templates/python-version",
+      "to": ".python-version"
+    },
+    {
+      "from": "templates/pyproject.toml",
+      "to": "pyproject.toml"
+    },
+    {
+      "from": "templates/scripts/install-mise.sh",
+      "to": "scripts/install-mise.sh"
+    },
+    {
+      "from": "templates/github/workflows/ci.yml",
+      "to": ".github/workflows/ci.yml"
+    },
+    {
+      "from": "templates/github/dependabot.yml",
+      "to": ".github/dependabot.yml"
+    },
+    {
+      "from": "templates/tests/test_toolchain.py",
+      "to": "tests/test_toolchain.py"
+    },
+    {
+      "from": "templates/src/__init__.py",
+      "to": "src/{{python_package}}/__init__.py"
+    },
+    {
+      "from": "templates/src/cli.py",
+      "to": "src/{{python_package}}/cli.py",
+      "stage": "app"
+    },
+    {
+      "from": "templates/tests/test_cli.py",
+      "to": "tests/test_cli.py",
+      "stage": "app"
+    }
+  ],
+  "requiredChecks": [
+    "check"
+  ],
+  "releasePaths": {
+    "noneAllowed": [
+      "tests/",
+      "mise.toml",
+      "mise.lock",
+      "scripts/install-mise.sh"
+    ],
+    "noneForbidden": []
+  },
+  "claudeIndexLines": [
+    "- Python with mise, uv, ruff and pytest: [coding standards](docs/coding-standards.md#python-toolchain). Run `mise run check` before pushing."
+  ],
+  "screening": [
+    {
+      "dependency": "mise",
+      "maintainer": "jdx (independent open source maintainer)",
+      "listed": "N",
+      "note": "MIT licence."
+    },
+    {
+      "dependency": "aqua registry (mise's aqua backend)",
+      "maintainer": "aqua project (independent open source)",
+      "listed": "N",
+      "note": "MIT licence. Only resolves release downloads; the tools themselves are screened separately."
+    },
+    {
+      "dependency": "jdx/mise-action",
+      "maintainer": "jdx (independent open source maintainer)",
+      "listed": "N",
+      "note": "MIT licence."
+    },
+    {
+      "dependency": "uv and ruff",
+      "maintainer": "Astral",
+      "listed": "N",
+      "note": "Open source (Apache-2.0 or MIT). Astral announced on 19 March 2026 that it is joining OpenAI, with the deal pending when checked; OpenAI is on neither list. Re-check once the deal closes."
+    },
+    {
+      "dependency": "CPython",
+      "maintainer": "Python Software Foundation",
+      "listed": "N",
+      "note": "PSF licence."
+    },
+    {
+      "dependency": "pytest",
+      "maintainer": "pytest-dev (community open source)",
+      "listed": "N",
+      "note": "MIT licence."
+    },
+    {
+      "dependency": "pytest-asyncio",
+      "maintainer": "pytest-dev (community open source)",
+      "listed": "N",
+      "note": "Apache-2.0 licence."
+    },
+    {
+      "dependency": "PyYAML",
+      "maintainer": "The YAML Project (community open source)",
+      "listed": "N",
+      "note": "MIT licence. Dev-only: the toolchain tests read dependabot.yml with it."
+    },
+    {
+      "dependency": "shellcheck",
+      "maintainer": "koalaman (independent open source maintainer)",
+      "listed": "N",
+      "note": "GPL-3.0 licence. Dev tool only."
+    }
+  ]
+}

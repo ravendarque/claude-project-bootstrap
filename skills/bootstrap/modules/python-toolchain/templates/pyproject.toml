@@ -1,0 +1,36 @@
+[project]
+name = "{{slug}}"
+version = "0.1.0"  # inert placeholder; releases are git tags (docs/versioning.md)
+description = {{description_toml}}
+readme = "README.md"
+requires-python = ">=@@PYTHON_MINOR@@"
+dependencies = []
+
+[project.scripts]
+{{slug}} = "{{python_package}}.cli:main"
+
+[build-system]
+requires = ["@@UV_BUILD_REQUIRES@@"]
+build-backend = "uv_build"
+
+[tool.uv]
+exclude-newer = "72 hours"
+
+[tool.uv.build-backend]
+module-name = "{{python_package}}"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[dependency-groups]
+dev = []

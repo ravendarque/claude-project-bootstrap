@@ -7,7 +7,7 @@ manual steps follow [manual-step-format.md](../skills/bootstrap/reference/manual
 1. **Open an issue** describing the stack and what the module sets up.
 2. **Screen its default dependencies and vendors** against the BDS lists and
    record them in the manifest's `screening`.
-3. **Write `manifest.json`**: `dependsOn`, `questions`, `files` (mark
+3. **Write `manifest.json`**: `dependsOn`, `conflictsWith` (for a stack that excludes another), `questions`, `files` (mark
    application files `"stage": "app"` so they ship in the first PR),
    `merge: true` to extend another module's JSON (such as `package.json`),
    `overrides` only to replace a file wholesale, `allowBuilds` for any
