@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { checkReleasePaths } from "../skills/bootstrap/modules/core/templates/github/scripts/check-release-paths.mjs";
 import { files, renderReal } from "./helpers.mjs";
 
 const cf = { zone_name: "example.test" };
@@ -29,11 +30,43 @@ test("releases only come from PRs merged into main", () => {
   assert.match(read(renders.core, ".github/workflows/release.yml"), /types: \[closed\]\n\s+branches: \[main\]/);
 });
 
-test("dependabot PRs carry a release label", () => {
-  const core = read(renders.core, ".github/dependabot.yml");
-  assert.match(core, /labels:\n\s+- "release: none"/);
-  const js = read(renders.js, ".github/dependabot.yml");
-  assert.match(js, /package-ecosystem: "npm"[\s\S]*?labels:\n\s+- "release: patch"/);
+const releaseLabelsByEcosystem = { "github-actions": "release: none", npm: "release: patch", uv: "release: patch" };
+
+function dependabotUpdates(text) {
+  return text
+    .split(/^ {2}- (?=package-ecosystem:)/m)
+    .slice(1)
+    .map(block => ({
+      ecosystem: block.match(/^package-ecosystem: "([^"]+)"/)[1],
+      labels: [...(block.match(/^ {4}labels:\n((?: {6}- .*\n)+)/m)?.[1] ?? "").matchAll(/- "([^"]+)"/g)].map(m => m[1]),
+    }));
+}
+
+test("every dependabot update carries exactly the release label for its ecosystem", () => {
+  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renderReal(["python-toolchain"]) };
+  for (const [name, dir] of Object.entries(combinations)) {
+    const updates = dependabotUpdates(read(dir, ".github/dependabot.yml"));
+    assert.ok(updates.length > 0, name);
+    for (const { ecosystem, labels } of updates) {
+      const expected = releaseLabelsByEcosystem[ecosystem];
+      assert.ok(expected, `${name}: no expected label for ${ecosystem}`);
+      assert.deepEqual(labels.filter(label => label.startsWith("release:")), [expected], `${name} ${ecosystem}`);
+    }
+  }
+});
+
+test("the labels dependabot applies are ones core creates", () => {
+  const created = JSON.parse(read(renders.core, ".bootstrap/github/labels.json")).map(label => label.name);
+  for (const label of Object.values(releaseLabelsByEcosystem)) assert.ok(created.includes(label), label);
+});
+
+test("a release: none actions bump passes the path guard in every combination", () => {
+  const bumped = [".github/workflows/test.yml", ".github/workflows/release.yml", ".github/actions/setup-node-pnpm/action.yml"];
+  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renderReal(["python-toolchain"]) };
+  for (const [name, dir] of Object.entries(combinations)) {
+    const { ok, offending } = checkReleasePaths(bumped, JSON.parse(read(dir, ".github/release-paths.json")));
+    assert.ok(ok, `${name}: ${offending}`);
+  }
 });
 
 test("deploys only run from release tags", () => {
