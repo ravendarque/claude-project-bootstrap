@@ -11,13 +11,13 @@ Describe the components, where each runs, and how data flows between them.
 
 | Boundary | Between | What crosses it | Controls |
 |---|---|---|---|
-| | | | |
+| Release job → GitHub API | `release.yml` and the release GitHub App | Short-lived App token (Contents and Workflows: read and write) to push release tags and create releases | Token minted only in the release job and scoped to this repository; App installed on this repository only; private key held as a repository secret |
 
 ## Assets
 
 | Asset | Why it matters |
 |---|---|
-| | |
+| Release App private key | Anyone holding it can mint tokens that push tags and, through Workflows, change workflow files |
 
 ## Actors
 
@@ -37,7 +37,7 @@ Describe the components, where each runs, and how data flows between them.
 | | Repudiation | | |
 | | Information disclosure | | |
 | | Denial of service | | |
-| | Elevation of privilege | | |
+| Leaked release token or App key used to alter workflow files | Elevation of privilege | The Workflows permission is needed because GitHub refuses a tag whose commit's workflow files differ from the default branch's. Tokens last one hour and are minted only in the release job; the key is a repository secret; the App is installed on this repository only | Accepted |
 
 ## Known gaps
 
