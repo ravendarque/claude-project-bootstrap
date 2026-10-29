@@ -9,6 +9,7 @@ and `templates/`.
 |---|---|
 | `name` | Folder name |
 | `dependsOn` | Modules that must also be selected; the renderer pulls them in first |
+| `conflictsWith` | Modules that cannot be selected together with this one, whether chosen directly or pulled in through `dependsOn`; resolution fails naming both |
 | `maxSlugLength` | The longest slug the module's derived names allow (default 63) |
 | `questions` | Interview questions: `{ key, type, prompt }`, where `type` is `boolean`, `string` or `hostname`; answers are checked against it |
 | `files` | `{ from, to, when?, stage? }`; `when` is an answer key (truthy) or `!key` (falsy); `stage` is `initial` (default, pushed with the initial commit) or `app` (shipped in the first PR); `merge: true` deep-merges a JSON file into the one an earlier module writes |
@@ -19,7 +20,8 @@ and `templates/`.
 | `claudeIndexLines` | Lines added to the generated `CLAUDE.md` index |
 | `screening` | Dependency and vendor screening rows: `{ dependency, maintainer, listed, note }` |
 
-Templates use `{{key}}` for answers and derived keys. `${{ … }}` (GitHub
+Templates use `{{key}}` for answers and derived keys, and so does a file's
+`to` path. `${{ … }}` (GitHub
 Actions expressions) is never substituted. An unresolved placeholder fails
 the render, and nothing is written.
 
@@ -27,8 +29,10 @@ Derived keys: `slug`, `required_checks_json`, `claude_index`,
 `coding_standards_modules`, `screening_table`, `release_paths_json`,
 `repo_url`, `claude_stack_section`, `allow_builds_yaml`. Answers also gain `private`,
 `licensor` (defaulted), and escaped forms of the name for code and markup:
-`name_js`, `greeting_js`, `name_html`. Never put `{{name}}` inside a JS
-string or HTML.
+`name_js`, `greeting_js`, `name_html`, `description_toml`; and
+`python_package`, the slug as a Python identifier (`-` becomes `_`, and a
+trailing `_` is added when that is a Python keyword). Never put `{{name}}`
+inside a JS or Python string or HTML, or `{{description}}` inside a TOML string.
 
 A module with a release artefact renders its own workflow that runs on
 `release: published`, builds the artefact with the module's toolchain, and

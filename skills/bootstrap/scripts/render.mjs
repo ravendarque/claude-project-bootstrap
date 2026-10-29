@@ -15,6 +15,7 @@ function loadManifest(name, modulesDir) {
 export function resolveModules(selected, modulesDir) {
   const ordered = [];
   const visiting = [];
+  const requiredByOf = new Map();
   const visit = (name, requiredBy) => {
     if (ordered.some(m => m.name === name)) return;
     if (visiting.includes(name)) throw new Error(`Dependency cycle: ${[...visiting.slice(visiting.indexOf(name)), name].join(" -> ")}`);
@@ -25,6 +26,7 @@ export function resolveModules(selected, modulesDir) {
       if (requiredBy) throw new Error(`Missing dependency: ${requiredBy} requires ${name}`);
       throw error;
     }
+    requiredByOf.set(name, requiredBy);
     visiting.push(name);
     for (const dep of manifest.dependsOn ?? []) visit(dep, name);
     visiting.pop();
@@ -32,11 +34,35 @@ export function resolveModules(selected, modulesDir) {
   };
   visit("core");
   for (const name of selected) visit(name);
+  rejectConflicts(ordered, requiredByOf);
   return ordered;
+}
+
+function rejectConflicts(ordered, requiredByOf) {
+  const present = name => {
+    const via = requiredByOf.get(name);
+    return via ? `${name} (required by ${via})` : name;
+  };
+  for (const module of ordered) {
+    for (const other of module.conflictsWith ?? []) {
+      if (ordered.some(m => m.name === other)) {
+        throw new Error(`Conflicting modules: ${present(module.name)} conflicts with ${present(other)}`);
+      }
+    }
+  }
 }
 
 export function maxSlugLength(modules) {
   return Math.min(63, ...modules.map(m => m.maxSlugLength ?? 63));
+}
+
+const PYTHON_KEYWORDS = new Set(
+  "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield".split(" "),
+);
+
+function pythonPackage(slug) {
+  const identifier = slug.replace(/-/g, "_");
+  return PYTHON_KEYWORDS.has(identifier) ? `${identifier}_` : identifier;
 }
 
 const DEFAULT_LICENSOR = "Ravendarque (https://github.com/ravendarque)";
@@ -68,6 +94,8 @@ export function validateAnswers(input, { maxSlugLength: limit = 63 } = {}) {
     name_js: JSON.stringify(name),
     name_html: escapeHtml(name),
     greeting_js: JSON.stringify(`Hello from ${name}`),
+    description_toml: JSON.stringify(String(input.description ?? "")),
+    python_package: pythonPackage(slug),
   };
   return { answers, slug };
 }
@@ -174,15 +202,16 @@ export function render({ modules, answers, modulesDir, destDir, dryRun = false, 
     for (const file of module.files ?? []) {
       if (!included(file, answers)) continue;
       if (stage && (file.stage ?? "initial") !== stage) continue;
-      const target = resolve(root, normalize(file.to));
+      const to = substitute(file.to, values, file.to);
+      const target = resolve(root, normalize(to));
       const rel = relative(root, target);
       if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
-        throw new Error(`Path escapes destination: ${file.to}`);
+        throw new Error(`Path escapes destination: ${to}`);
       }
       const source = join(modulesDir, module.name, file.from);
       const content = BINARY.test(source)
         ? readFileSync(source)
-        : substitute(readFileSync(source, "utf8"), values, file.to);
+        : substitute(readFileSync(source, "utf8"), values, to);
       const owner = owners.get(rel);
       if (file.merge) {
         if (!owner) throw new Error(`${module.name} merges into ${rel}, but no earlier module writes it`);

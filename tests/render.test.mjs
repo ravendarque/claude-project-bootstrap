@@ -22,6 +22,25 @@ test("resolveModules throws on an unknown module", () => {
   assert.throws(() => resolveModules(["zzz"], modulesDir), { message: "Unknown module: zzz" });
 });
 
+test("resolveModules rejects two selected modules that conflict", () => {
+  assert.throws(() => resolveModules(["a", "rival"], modulesDir), {
+    message: "Conflicting modules: rival conflicts with a",
+  });
+  assert.throws(() => resolveModules(["rival", "a"], modulesDir), {
+    message: "Conflicting modules: rival conflicts with a",
+  });
+});
+
+test("resolveModules rejects a conflict that only arises through dependsOn", () => {
+  assert.throws(() => resolveModules(["b", "needs-rival"], modulesDir), {
+    message: "Conflicting modules: rival (required by needs-rival) conflicts with a (required by b)",
+  });
+});
+
+test("resolveModules accepts a conflicting module on its own", () => {
+  assert.deepEqual(resolveModules(["rival"], modulesDir).map(m => m.name), ["core", "rival"]);
+});
+
 test("validateAnswers slugs a display name", () => {
   const { slug, answers } = validateAnswers({ name: "My Cool App!" });
   assert.equal(slug, "my-cool-app");

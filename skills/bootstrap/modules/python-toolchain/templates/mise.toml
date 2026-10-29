@@ -1,0 +1,22 @@
+[tools]
+
+[settings]
+lockfile = true
+locked = true
+
+[tasks.setup]
+description = "Install the locked Python dependencies"
+run = "uv sync --frozen"
+
+[tasks."check:python"]
+description = "Lint and test the Python code and the shell scripts"
+run = [
+  "uv run ruff check .",
+  "uv run ruff format --check .",
+  "shellcheck scripts/*.sh",
+  "uv run pytest -q",
+]
+
+[tasks.check]
+description = "Everything CI runs"
+depends = ["check:python"]
