@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brokenLinks, files, renderReal } from "./helpers.mjs";
 
@@ -49,6 +51,32 @@ test("screening ADR has a record table", () => {
 test("gitignore covers local state and secrets", () => {
   const ignore = read(".gitignore");
   for (const entry of [".bootstrap/", ".dev.vars", ".env*"]) assert.ok(ignore.includes(entry), entry);
+});
+
+test("gitignore keeps secrets and tool state out and config in", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ignore-"));
+  copyFileSync(join(dest, ".gitignore"), join(dir, ".gitignore"));
+  execFileSync("git", ["init", "-q", dir]);
+  const ignored = path => spawnSync("git", ["-c", "core.excludesFile=/dev/null", "-C", dir, "check-ignore", "-q", "--no-index", path]).status === 0;
+  for (const path of [
+    ".claude/settings.local.json",
+    ".claude/worktrees/x",
+    ".wrangler/state",
+    "infra/.terraform/providers",
+    "infra/terraform.tfstate",
+    "infra/terraform.tfstate.backup",
+    "infra/terraform.tfvars",
+    "test-results/x",
+    ".venv/x",
+    "src/app/__pycache__/x.pyc",
+    ".pytest_cache/x",
+    ".ruff_cache/x",
+  ]) {
+    assert.ok(ignored(path), `${path} should be ignored`);
+  }
+  for (const path of ["infra/terraform.tfvars.example", "infra/.terraform.lock.hcl", ".claude/settings.json", ".env.example"]) {
+    assert.ok(!ignored(path), `${path} should stay tracked`);
+  }
 });
 
 test("a core-only CLAUDE.md has no empty Stack section", () => {
