@@ -117,5 +117,9 @@ by hand at phone and desktop widths in light and dark themes.
   as real.
 - CI workflows declare least-privilege permissions and pin actions by commit
   SHA.
+- Every job's `runs-on` is an exact image (`ubuntu-26.04`, `macos-26`), never
+  a `-latest` label. Dependabot doesn't move it: when GitHub moves a
+  `-latest` label to a new image, move every pin to that image by hand in
+  one PR.
 
 {{coding_standards_modules}}

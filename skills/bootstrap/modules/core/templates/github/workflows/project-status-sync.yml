@@ -12,7 +12,7 @@ permissions:
 jobs:
   sync:
     if: github.actor != 'dependabot[bot]' && ((github.event_name == 'create' && github.ref_type == 'branch') || github.event_name == 'pull_request')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     env:
       GH_TOKEN: ${{ secrets.PROJECT_STATUS_PAT }}
       PROJECT_ID: ${{ vars.PROJECT_ID }}

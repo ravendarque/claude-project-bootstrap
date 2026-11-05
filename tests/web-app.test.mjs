@@ -69,7 +69,7 @@ const privateDest = renderReal(["web-app"], { visibility: "private" });
 
 test("public repos run Safari on macOS as a required check", () => {
   const safari = jobs(read(".github/workflows/test.yml"))["e2e-safari-run"];
-  assert.match(safari, /runs-on: macos-latest/);
+  assert.match(safari, /runs-on: macos-26/);
   assert.match(safari, /sudo safaridriver --enable/);
   assert.match(safari, /E2E_BROWSERS: safari/);
   const checks = JSON.parse(read(".bootstrap/github/ruleset.json")).rules.find(r => r.type === "required_status_checks")

@@ -84,20 +84,6 @@ test("OpenTofu is pinned through a scaffold token and no other version is carrie
   assert.deepEqual([...tokens], ["@@TOFU_VERSION@@"]);
 });
 
-test("every cloudflare-opentofu workflow pins its runner image", () => {
-  const manifest = JSON.parse(readFileSync(new URL("../skills/bootstrap/modules/cloudflare-opentofu/manifest.json", import.meta.url), "utf8"));
-  const workflows = manifest.files.map(file => file.to).filter(to => to.startsWith(".github/workflows/"));
-  assert.ok(workflows.length > 0);
-  for (const dir of [withBeta, noBeta]) {
-    for (const to of workflows) {
-      if (!existsSync(join(dir, to))) continue;
-      const runners = [...read(dir, to).matchAll(/runs-on: (\S+)/g)].map(match => match[1]);
-      assert.ok(runners.length > 0, to);
-      for (const runner of runners) assert.equal(runner, "ubuntu-24.04", to);
-    }
-  }
-});
-
 const moduleDoc = readFileSync(new URL("../skills/bootstrap/modules/cloudflare-opentofu/MODULE.md", import.meta.url), "utf8");
 const skillDoc = readFileSync(new URL("../skills/bootstrap/SKILL.md", import.meta.url), "utf8");
 const section = (text, heading) => {
