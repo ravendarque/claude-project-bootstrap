@@ -83,6 +83,13 @@ steps count as settled. Before re-running a create:
 2. **`interview`**: ask in plain chat for:
    - project name, one-line description, GitHub owner (a personal account
      in v1), visibility (public or private);
+   - for a private repo only, the owner's GitHub plan (`github_plan`: `free`,
+     `pro`, `team` or `enterprise`). First try
+     `gh api user --jq '.plan.name // empty'`: the API returns `plan` only to
+     a token with the `user` scope, so a typical token prints nothing. If it
+     prints a plan, record it lower-cased. If it prints nothing, say the token
+     can't read the plan and ask which plan the owner is on. Public repos get
+     these features on every plan: don't ask and record no plan;
    - the licence's copyright holder, defaulting to
      `Ravendarque (https://github.com/ravendarque)`; never a real name
      unless the user insists;
@@ -104,7 +111,8 @@ steps count as settled. Before re-running a create:
    - the files (`node scripts/render.mjs --modules <list> --answers <dir>/.bootstrap/answers.json --dest <dir> --dry-run`);
    - the GitHub repository and its visibility, the board, ruleset,
      environments and the security features;
-   - for a private repo, run `gh api user --jq .plan.name`; on `free`, say
+   - for a private repo, read the recorded `github_plan` (never the API
+     again, and a resumed run uses the saved value); on `free`, say
      the ruleset, secret scanning, push protection, dependency review and
      code scanning uploads aren't available, and that those steps will be
      skipped. Environments are different: GitHub's documentation says they

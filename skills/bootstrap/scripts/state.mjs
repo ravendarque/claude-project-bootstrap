@@ -33,8 +33,13 @@ export function saveRun(dir, { answers, modules }) {
 
 const HOSTNAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
+const GITHUB_PLANS = ["free", "pro", "team", "enterprise"];
+
 function checkQuestions(input, manifests) {
   if (!["public", "private"].includes(input.visibility)) throw new Error("visibility must be public or private");
+  if (input.visibility === "private" && !GITHUB_PLANS.includes(input.github_plan)) {
+    throw new Error(`github_plan must be one of ${GITHUB_PLANS.join(", ")} for a private repository`);
+  }
   for (const { key, type } of manifests.flatMap(m => m.questions ?? [])) {
     const value = input[key];
     if (type === "boolean") {

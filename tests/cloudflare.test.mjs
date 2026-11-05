@@ -142,3 +142,28 @@ test("the bootstrap skill checks environments on a free private repo rather than
   assert.match(plan, /checks\s+rather than assumes/);
   assert.match(plan, /only if that check fails/);
 });
+
+const coreDoc = readFileSync(new URL("../skills/bootstrap/modules/core/MODULE.md", import.meta.url), "utf8");
+
+test("no doc reads the plan from the API outside the interview", () => {
+  for (const doc of [skillDoc, moduleDoc, coreDoc]) {
+    assert.doesNotMatch(doc, /gh api user --jq \.plan\.name/);
+  }
+  assert.equal(skillDoc.match(/gh api user --jq/g).length, 3);
+});
+
+test("the interview asks for the plan only when the token can't read it, for private repos", () => {
+  const interview = skillDoc.slice(skillDoc.indexOf("**`interview`**"), skillDoc.indexOf("**`tools`**"));
+  assert.match(interview, /gh api user --jq '\.plan\.name \/\/ empty'/);
+  assert.match(interview, /`github_plan`/);
+  assert.match(interview, /can't read the plan/);
+  assert.match(interview, /Public repos get\s+these features on every plan/);
+});
+
+test("plan-dependent steps use the recorded github_plan", () => {
+  const plan = skillDoc.slice(skillDoc.indexOf("**`plan-confirmed`**"), skillDoc.indexOf("**`scaffold`**"));
+  assert.match(plan, /recorded `github_plan`/);
+  assert.match(plan, /resumed run uses the saved value/);
+  assert.match(coreDoc, /recorded `github_plan` is `free`/);
+  assert.match(moduleDoc, /recorded `github_plan` is `free`/);
+});

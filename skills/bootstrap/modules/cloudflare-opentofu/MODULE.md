@@ -31,7 +31,7 @@ and preview hostnames are built from it.
   on: apply fails on an existing CNAME and splits traffic with an existing
   A record.
 - Without a beta, the first merged release deploys straight to the apex.
-- **Free private repository** (`gh api user --jq .plan.name` is `free`):
+- **Free private repository** (the recorded `github_plan` is `free`):
   GitHub's documentation says environments need a paid plan for private
   repositories, but the bootstrap checks rather than assumes. It creates the
   environments and verifies their branch and tag policies took effect. Say
