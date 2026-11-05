@@ -68,7 +68,7 @@ test("a completed, failed or killed subagent frees the slot", async () => {
   const { hook } = load();
   for (const status of ["completed", "failed", "killed"]) {
     const done = fakeApi([{ type: "Explore", status }]);
-    assert.deepEqual(await hook(done, { subagentType: "general-purpose", model: "opus" }, fakeNext), { model: "opus" });
+    assert.deepEqual(await hook(done, { subagentType: "general-purpose", model: "opus" }, fakeNext), { model: "sonnet" });
   }
 });
 
@@ -77,10 +77,23 @@ test("the executor is still forced onto sonnet", async () => {
   assert.deepEqual(await hook(fakeApi(), { subagentType: EXEC, model: "opus" }, fakeNext), { model: "sonnet" });
 });
 
-test("an allowed non-executor keeps its requested model", async () => {
+test("an allowed Explore spawn is forced onto sonnet, whether it asks for opus or for no model", async () => {
   const { hook } = load();
-  assert.deepEqual(await hook(fakeApi(), { subagentType: "Explore", model: "opus" }, fakeNext), { model: "opus" });
-  assert.deepEqual(await hook(fakeApi(), { subagentType: "Explore" }, fakeNext), { model: undefined });
+  assert.deepEqual(await hook(fakeApi(), { subagentType: "Explore", model: "opus" }, fakeNext), { model: "sonnet" });
+  assert.deepEqual(await hook(fakeApi(), { subagentType: "Explore" }, fakeNext), { model: "sonnet" });
+  assert.deepEqual(await hook(fakeApi(), { subagentType: "general-purpose", model: "haiku" }, fakeNext), { model: "sonnet" });
+});
+
+test("a fork is passed through with its event unchanged", async () => {
+  const { hook } = load();
+  const event = { subagentType: "fork", fork: true, model: "opus" };
+  assert.equal(await hook(fakeApi(), event, async (e) => e), event);
+});
+
+test("a fork is still denied while a subagent is running", async () => {
+  const { hook } = load();
+  const busy = fakeApi([{ type: "Explore", status: "running" }]);
+  assert.ok((await hook(busy, { subagentType: "fork", fork: true }, fakeNext)).deny);
 });
 
 test("a spawn denied by the list check releases the reservation", async () => {
