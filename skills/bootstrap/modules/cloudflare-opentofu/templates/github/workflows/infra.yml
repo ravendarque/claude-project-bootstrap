@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: infra-${{ github.event_name == 'pull_request' && github.ref || 'apply' }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tofu:

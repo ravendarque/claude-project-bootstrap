@@ -7,6 +7,9 @@ browser support, loading, empty and error states, and accessibility.
   built app, and in Safari on a macOS runner for public repositories
   (`E2E_BROWSERS` picks the browsers). axe-core checks every page against WCAG 2.2 AA at phone width
   in light and dark themes; a new page joins the accessibility spec's list.
+- **Browser runs wait for lint and typecheck.** The `e2e` and `e2e-safari`
+  checks fail with a reason if a quick check failed, rather than passing as
+  skipped. Superseded pull request runs are cancelled.
 - **Escape all user-controlled data** before it's interpolated into HTML.
   Never build markup from raw input.
 - **A real `<button>` for anything clickable.** Modals have
