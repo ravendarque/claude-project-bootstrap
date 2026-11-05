@@ -83,6 +83,20 @@ test("saveAnswers requires visibility to be public or private", () => {
   }
 });
 
+test("saveAnswers requires a known github_plan for a private repository only", () => {
+  for (const github_plan of [undefined, "", "Free", "paid"]) {
+    assert.throws(() => saveAnswers(tmp(), { name: "A", visibility: "private", github_plan }, [], realModulesDir), {
+      message: "github_plan must be one of free, pro, team, enterprise for a private repository",
+    });
+  }
+  for (const github_plan of ["free", "pro", "team", "enterprise"]) {
+    const dir = tmp();
+    saveAnswers(dir, { name: "A", visibility: "private", github_plan }, [], realModulesDir);
+    assert.equal(loadState(dir).answers.github_plan, github_plan);
+  }
+  saveAnswers(tmp(), { name: "A", visibility: "public" }, [], realModulesDir);
+});
+
 test("saveAnswers checks each selected module's questions by type", () => {
   const base = { name: "A", visibility: "public", zone_name: "example.com" };
   assert.throws(() => saveAnswers(tmp(), { ...base, beta: "no" }, ["cloudflare-opentofu"], realModulesDir), {
