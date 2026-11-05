@@ -17,9 +17,9 @@ One Sonnet-class subagent does all delegated work, one at a time.
   by step, bulk renames, doc updates from a settled decision, digging
   through CI logs, and longer investigations.
 - **No sub-sessions, no mix of sessions and subagents, and no parallel
-  workers**, even when their files don't overlap. Extra or parallel agents
-  use up subscription token limits too quickly. Sub-sessions were tried
-  first because they show in the sidebar, but they couldn't be governed.
+  workers**, even when their files don't overlap. Sub-sessions can't be
+  governed the same way, and extra or parallel agents use up subscription
+  token limits too quickly.
 - **Long or open-ended work is split into sequential subagent runs.** The
   main session decides between them.
 - **Follow-ups go to the existing subagent**, not a new one.
