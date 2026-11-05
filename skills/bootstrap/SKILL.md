@@ -105,9 +105,13 @@ steps count as settled. Before re-running a create:
    - the GitHub repository and its visibility, the board, ruleset,
      environments and the security features;
    - for a private repo, run `gh api user --jq .plan.name`; on `free`, say
-     the ruleset, secret scanning, push protection, dependency review,
-     code scanning uploads and environment secrets aren't available, and
-     that those steps will be skipped;
+     the ruleset, secret scanning, push protection, dependency review and
+     code scanning uploads aren't available, and that those steps will be
+     skipped. Environments are different: GitHub's documentation says they
+     need a paid plan for private repositories, but the bootstrap checks
+     rather than assumes. It creates them and verifies their branch policies,
+     and only if that check fails does the module fall back to repository-level
+     secrets;
    - every manual step ahead, and its cost (usually nothing). Say plainly
      that there's nothing to do for them yet: you'll walk the user through
      each one, one at a time, after the GitHub configuration;

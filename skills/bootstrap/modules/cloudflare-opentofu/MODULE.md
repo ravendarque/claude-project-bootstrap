@@ -32,12 +32,15 @@ and preview hostnames are built from it.
   A record.
 - Without a beta, the first merged release deploys straight to the apex.
 - **Free private repository** (`gh api user --jq .plan.name` is `free`):
-  environments aren't available, so the infra apply and state read-write
-  credentials are repository secrets. Any workflow on any branch can read
-  them, so a pull request that edits a workflow can reach the live zone and
-  the state. The alternative is upgrading the plan (GitHub Pro or Team),
-  which allows environments limited to `main` and tags. Offer both and let
-  the user choose.
+  GitHub's documentation says environments need a paid plan for private
+  repositories, but the bootstrap checks rather than assumes. It creates the
+  environments and verifies their branch and tag policies took effect. Say
+  that the module falls back only if the check fails: then the infra apply
+  and state read-write credentials become repository secrets, which any
+  workflow on any branch can read, so a pull request that edits a workflow
+  could reach the live zone and the state. In that case the alternative is
+  upgrading the plan (GitHub Pro or Team); offer both and let the user
+  choose.
 
 ## 3. Files
 
@@ -77,13 +80,6 @@ release that is a draft or a pre-release is never used.
    Strip the leading `v`.
 2. Replace the token: `sed -i 's/@@TOFU_VERSION@@/<version>/' .github/workflows/infra.yml`.
 3. Check that none survives: `! grep -rn '@@[A-Z0-9_]*@@' .github/workflows`.
-4. Free private repository only: add a row to `docs/threat-model.md`'s
-   STRIDE table, after the existing rows: threat "Any workflow on any branch
-   can read the repository-level infra apply and state read-write
-   credentials", category Elevation of privilege, mitigation "Environments
-   limited to `main` aren't available on a free private repository; upgrade
-   the plan and move these secrets into the `infra` environment", status
-   Accepted.
 
 `tofu_version` is exact, so Dependabot never bumps it. To upgrade, resolve
 the newest release more than 72 hours old as above, change `tofu_version` in
@@ -92,11 +88,9 @@ the newest release more than 72 hours old as above, change `tofu_version` in
 ## 4. GitHub configuration
 
 After core's configuration. Steps `github:cloudflare-opentofu:<n>`.
-Environments need a paid plan on a free private repo: skip them there, as
-the plan said, record each skipped step with `state.mjs skip`, and set the
-secrets at repository level instead.
 
-1. Environments, each limited to the refs that may deploy from it:
+1. Environments, on every plan, each limited to the refs that may deploy
+   from it:
    - `infra`: the `main` branch only;
    - `production`: `main` (promote runs from it) and tags `v*`, or tags
      `v*` only without a beta;
@@ -106,6 +100,33 @@ secrets at repository level instead.
    `{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}`,
    then for each allowed ref
    `gh api -X POST repos/$R/environments/<env>/deployment-branch-policies -f name=<ref> -f type=<branch|tag>`.
+
+   **Verify each one straight after creating it.** Both must pass:
+   - `gh api repos/$R/environments/<env> --jq '.deployment_branch_policy'`
+     prints `{"custom_branch_policies":true,"protected_branches":false}`,
+     not `null`;
+   - `gh api repos/$R/environments/<env>/deployment-branch-policies --jq '[.branch_policies[] | "\(.type):\(.name)"] | sort'`
+     lists exactly the expected refs: `["branch:main"]` for `infra`,
+     `["branch:main","tag:v*"]` for `production` with a beta, `["tag:v*"]`
+     for `production` without one and for `beta`.
+
+   If every environment passes, record the step done.
+
+   **Fallback, only if a create or a verification above fails** (typically
+   a free private repository, where GitHub's documentation says
+   environments aren't available), and for no other reason:
+   - record each environment that failed as skipped:
+     `node scripts/state.mjs skip <dir> github:cloudflare-opentofu:1 "environment branch policy not available: <what failed>"`;
+   - set the secrets of a skipped environment at repository level (the
+     manual steps say how);
+   - add a row to `docs/threat-model.md`'s STRIDE table, after the existing
+     rows, on the first PR's branch: threat "Any workflow on any branch can
+     read the repository-level infra apply and state read-write
+     credentials", category Elevation of privilege, mitigation "Environment
+     branch policies weren't available on this repository when it was
+     bootstrapped; upgrade the plan and move these secrets into the `infra`
+     environment", status Accepted;
+   - offer the plan upgrade (GitHub Pro or Team) and let the user choose.
 2. `gh variable set CLOUDFLARE_ACCOUNT_ID --repo $R --body <account id>`
    (ask the user for it; it isn't confidential).
 
@@ -133,8 +154,9 @@ Then set each secret:
 
 Never add a per-Worker granular policy by editing an existing token.
 
-On a free private repo (no environments), drop every `--env <name>` above
-and set the secrets at repository level.
+If github:cloudflare-opentofu:1 recorded an environment as skipped (its
+fallback), drop `--env <name>` for that environment's secrets and set them
+at repository level.
 
 **Verify (Claude runs):** ask the user to run, for each token,
 `curl -s -H "Authorization: Bearer <token>" https://api.cloudflare.com/client/v4/user/tokens/verify | jq .result.status`
@@ -168,13 +190,12 @@ tokens, both applied to the `<slug>-tfstate` bucket only:
    `gh secret set TF_STATE_READ_ACCESS_KEY_ID --repo $R` and
    `gh secret set TF_STATE_READ_SECRET_ACCESS_KEY --repo $R`.
 
-On a free private repo (no environments), set the read-write pair at
-repository level too.
+If `infra` was skipped, set the read-write pair at repository level too.
 
 **Verify (Claude runs):** `gh secret list --repo $R` and
 `gh secret list --repo $R --env infra`.
 **Expected:** the read-only pair at repository level, the read-write pair in
-`infra` (or both at repository level on a free private repo).
+`infra` (or both at repository level if `infra` was skipped).
 
 ### cloudflare-opentofu:4 Apply the infrastructure
 
