@@ -6,7 +6,8 @@
     ".gitignore",
     "*.md",
     "tests/",
-    "package.json"
+    "package.json",
+    "pnpm-lock.yaml"
   ],
   "noneForbidden": []
 }
