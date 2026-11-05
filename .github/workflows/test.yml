@@ -27,8 +27,7 @@ jobs:
           cd "$dir/project"
           pnpm dlx "@biomejs/biome@$spec" format .
       - name: Validate plugin manifests
-        # npx, not pnpm dlx: pnpm's fetch timeout aborts the validator's 130 MB native binary download
-        run: npx --yes @anthropic-ai/claude-code@2.1.310 plugin validate .
+        run: pnpm --config.fetch-timeout=600000 dlx @anthropic-ai/claude-code@2.1.310 plugin validate .
       - name: Identifier guard
         env:
           IDENTIFIER_DENYLIST: ${{ secrets.IDENTIFIER_DENYLIST }}
