@@ -61,7 +61,7 @@ test("the templates hold no versions, only the tokens the scaffold fills in", ()
 
 test("CI pins its runner and its actions, and runs the same tasks as development", () => {
   const ci = read(".github/workflows/ci.yml");
-  assert.match(ci, /runs-on: ubuntu-24\.04$/m);
+  assert.match(ci, /runs-on: ubuntu-26\.04$/m);
   assert.match(ci, /persist-credentials: false/);
   for (const [, ref] of ci.matchAll(/uses: (\S+)/g)) assert.match(ref, /@[0-9a-f]{40}$/);
   assert.match(ci, /run: mise run setup/);

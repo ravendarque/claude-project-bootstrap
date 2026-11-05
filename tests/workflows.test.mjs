@@ -11,6 +11,8 @@ const renders = {
   corePrivate: renderReal([], { visibility: "private" }),
   js: renderReal(["js-toolchain"]),
   web: renderReal(["web-app"]),
+  webPrivate: renderReal(["web-app"], { visibility: "private" }),
+  python: renderReal(["python-toolchain"]),
   cfBeta: renderReal(["cloudflare-opentofu"], { ...cf, beta: true }),
   cfNoBeta: renderReal(["cloudflare-opentofu"], { ...cf, beta: false }),
 };
@@ -22,6 +24,18 @@ test("every workflow that checks out code can read contents", () => {
     for (const wf of workflows(dir)) {
       const text = read(dir, wf);
       if (text.includes("actions/checkout@")) assert.match(text, /contents: (read|write)/, `${name} ${wf}`);
+    }
+  }
+});
+
+const runnerImages = ["ubuntu-26.04", "macos-26"];
+
+test("every job runs on an exactly pinned runner image", () => {
+  for (const [name, dir] of Object.entries(renders)) {
+    for (const wf of workflows(dir)) {
+      const runners = [...read(dir, wf).matchAll(/^\s*runs-on:\s*(.*?)\s*$/gm)].map(match => match[1]);
+      assert.ok(runners.length > 0, `${name} ${wf}`);
+      for (const runner of runners) assert.ok(runnerImages.includes(runner), `${name} ${wf}: ${runner}`);
     }
   }
 });
@@ -43,7 +57,7 @@ function dependabotUpdates(text) {
 }
 
 test("every dependabot update carries exactly the release label for its ecosystem", () => {
-  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renderReal(["python-toolchain"]) };
+  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renders.python };
   for (const [name, dir] of Object.entries(combinations)) {
     const updates = dependabotUpdates(read(dir, ".github/dependabot.yml"));
     assert.ok(updates.length > 0, name);
@@ -62,7 +76,7 @@ test("the labels dependabot applies are ones core creates", () => {
 
 test("a release: none actions bump passes the path guard in every combination", () => {
   const bumped = [".github/workflows/test.yml", ".github/workflows/release.yml", ".github/actions/setup-node-pnpm/action.yml"];
-  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renderReal(["python-toolchain"]) };
+  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renders.python };
   for (const [name, dir] of Object.entries(combinations)) {
     const { ok, offending } = checkReleasePaths(bumped, JSON.parse(read(dir, ".github/release-paths.json")));
     assert.ok(ok, `${name}: ${offending}`);
@@ -143,10 +157,9 @@ test("cloudflare dev serves on the port the launch config expects", () => {
 const triggers = text => text.match(/^on:\n((?:  .*\n|\n)+)/m)[1];
 
 test("every workflow that runs PR checks cancels superseded runs, and never cancels pushes or releases", () => {
-  const all = { ...renders, python: renderReal(["python-toolchain"]) };
   const exempt = new Set(["project-status-sync.yml", "release.yml"]);
   let checked = 0;
-  for (const [name, dir] of Object.entries(all)) {
+  for (const [name, dir] of Object.entries(renders)) {
     for (const wf of workflows(dir)) {
       const text = read(dir, wf);
       const where = `${name} ${wf}`;

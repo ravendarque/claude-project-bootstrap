@@ -58,8 +58,9 @@ and preview hostnames are built from it.
   install script in `pnpm-workspace.yaml`.
 - Application (first PR): `src/worker.js`, `test/worker.test.js`.
 
-Every `runs-on` in this module's workflows is `ubuntu-24.04`, so a runner
-image migration is a deliberate change.
+Every `runs-on` in this module's workflows is `ubuntu-26.04`, so a runner
+image migration is a deliberate change: when GitHub moves `ubuntu-latest` to
+a new image, move the pin to that image by hand.
 
 The templates hold no OpenTofu version. `infra.yml` carries the token
 `@@TOFU_VERSION@@` as `setup-opentofu`'s `tofu_version`, which the scaffold
