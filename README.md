@@ -47,7 +47,7 @@ To add a stack, see [adding a module](docs/adding-a-module.md).
 
 ## Develop
 
-`npm test` runs the test suite (Node's built-in runner; no dependencies).
+`pnpm test` runs the test suite (Node's built-in runner; no dependencies).
 
 ## Licence
 
