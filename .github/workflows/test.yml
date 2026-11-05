@@ -27,7 +27,7 @@ jobs:
           cd "$dir/project"
           pnpm dlx "@biomejs/biome@$spec" format .
       - name: Validate plugin manifests
-        run: pnpm --config.fetch-timeout=600000 dlx @anthropic-ai/claude-code@2.1.310 plugin validate .
+        run: pnpm dlx @anthropic-ai/claude-code@2.1.310 plugin validate .
       - name: Identifier guard
         env:
           IDENTIFIER_DENYLIST: ${{ secrets.IDENTIFIER_DENYLIST }}
