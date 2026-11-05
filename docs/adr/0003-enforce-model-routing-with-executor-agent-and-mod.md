@@ -86,7 +86,5 @@ Option 3. The plugin ships:
   unchanged. A broken hook must not block every subagent spawn, at the cost
   of losing enforcement silently. `claude plugin validate` flags a gating
   hook without a `.catch`, and reports this one as `gating hook with .catch`.
-- [ADR-0004](0004-limit-every-subagent-spawn-to-one-at-a-time.md) amends this:
-  the one-at-a-time limit now covers every subagent spawn, not only the executor.
 - The mods API is versioned with Claude Code and can change between
   releases; revisit this if the `agent.spawn` hook changes.
