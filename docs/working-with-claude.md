@@ -36,10 +36,12 @@ The bootstrap skill is the scripted case. Its `bootstrap-executor` agent
 GitHub configuration and the first-PR mechanics, while the main session
 keeps the interview, the plan, each go-ahead, repository creation and the
 initial push, and the verification. The plugin's routing mod
-(`hooks/register.js`) forces the executor onto Sonnet and refuses any second
-subagent, of any type, while one is active:
+(`hooks/register.js`) forces every subagent onto Sonnet, whatever its type
+or the model the call asks for (forks inherit the parent's model and are
+exempt), and refuses a second subagent while one is active:
 [ADR-0003](adr/0003-enforce-model-routing-with-executor-agent-and-mod.md),
-[ADR-0004](adr/0004-limit-every-subagent-spawn-to-one-at-a-time.md).
+[ADR-0004](adr/0004-limit-every-subagent-spawn-to-one-at-a-time.md),
+[ADR-0005](adr/0005-force-sonnet-on-every-subagent-spawn.md).
 
 ## Memory
 

@@ -1,4 +1,4 @@
 {
-  "description": "Routing enforcement: one subagent at a time, bootstrap-executor forced onto Sonnet",
+  "description": "Routing enforcement: one subagent at a time, every subagent forced onto Sonnet",
   "modules": ["./register.js"]
 }
