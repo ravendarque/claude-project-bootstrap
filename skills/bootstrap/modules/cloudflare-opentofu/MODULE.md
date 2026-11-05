@@ -31,6 +31,13 @@ and preview hostnames are built from it.
   on: apply fails on an existing CNAME and splits traffic with an existing
   A record.
 - Without a beta, the first merged release deploys straight to the apex.
+- **Free private repository** (`gh api user --jq .plan.name` is `free`):
+  environments aren't available, so the infra apply and state read-write
+  credentials are repository secrets. Any workflow on any branch can read
+  them, so a pull request that edits a workflow can reach the live zone and
+  the state. The alternative is upgrading the plan (GitHub Pro or Team),
+  which allows environments limited to `main` and tags. Offer both and let
+  the user choose.
 
 ## 3. Files
 
@@ -47,6 +54,40 @@ and preview hostnames are built from it.
   runs `wrangler dev`, so e2e tests the real Worker. Allows `workerd`'s
   install script in `pnpm-workspace.yaml`.
 - Application (first PR): `src/worker.js`, `test/worker.test.js`.
+
+Every `runs-on` in this module's workflows is `ubuntu-24.04`, so a runner
+image migration is a deliberate change.
+
+The templates hold no OpenTofu version. `infra.yml` carries the token
+`@@TOFU_VERSION@@` as `setup-opentofu`'s `tofu_version`, which the scaffold
+fills in so nothing is stale on the day of the bootstrap. The render test
+checks that the template carries the token; step 3 of the scaffold checks
+that none is left after it.
+
+**Scaffold:** after rendering the initial stage, and with `<dir>` as the
+working directory. "Old enough" means published more than 72 hours ago, and a
+release that is a draft or a pre-release is never used.
+
+1. Resolve the OpenTofu version:
+
+   ```bash
+   gh api "repos/opentofu/opentofu/releases?per_page=30" --jq '[.[] | select(.prerelease == false and .draft == false and (.published_at | fromdateiso8601) < (now - 259200))][0].tag_name'
+   ```
+
+   Strip the leading `v`.
+2. Replace the token: `sed -i 's/@@TOFU_VERSION@@/<version>/' .github/workflows/infra.yml`.
+3. Check that none survives: `! grep -rn '@@[A-Z0-9_]*@@' .github/workflows`.
+4. Free private repository only: add a row to `docs/threat-model.md`'s
+   STRIDE table, after the existing rows: threat "Any workflow on any branch
+   can read the repository-level infra apply and state read-write
+   credentials", category Elevation of privilege, mitigation "Environments
+   limited to `main` aren't available on a free private repository; upgrade
+   the plan and move these secrets into the `infra` environment", status
+   Accepted.
+
+`tofu_version` is exact, so Dependabot never bumps it. To upgrade, resolve
+the newest release more than 72 hours old as above, change `tofu_version` in
+`infra.yml`, and keep the local `tofu` on the same version.
 
 ## 4. GitHub configuration
 

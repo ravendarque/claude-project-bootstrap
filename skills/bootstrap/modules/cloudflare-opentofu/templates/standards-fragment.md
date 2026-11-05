@@ -13,6 +13,9 @@ whether the design is idiomatic for the platform rather than fighting it.
   state in plain text.
 - **Data-bearing resources have `prevent_destroy`.** The infra workflow
   refuses any plan that deletes.
+- **Tools and runners are pinned exactly.** `tofu_version` in `infra.yml`
+  is an exact release more than 72 hours old, upgraded by hand because
+  Dependabot doesn't track it; every workflow runs on `ubuntu-24.04`.
 - **Least-privilege tokens**, one per job (preview, deploy, infra plan,
   infra apply), each scoped to the narrowest account or zone that offers the
   permission.

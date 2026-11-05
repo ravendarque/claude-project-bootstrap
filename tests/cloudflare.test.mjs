@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { brokenLinks, renderReal } from "./helpers.mjs";
 
@@ -70,4 +70,30 @@ test("infrastructure runs on OpenTofu", () => {
   assert.match(infra, /run: tofu plan/);
   assert.doesNotMatch(infra, /terraform (init|plan|apply)/);
   assert.match(read(withBeta, "infra/README.md"), /OpenTofu/);
+});
+
+test("OpenTofu is pinned through a scaffold token and no other version is carried", () => {
+  const infra = read(withBeta, ".github/workflows/infra.yml");
+  assert.match(infra, /tofu_version: "@@TOFU_VERSION@@"/);
+  const tokens = new Set();
+  for (const dir of [withBeta, noBeta]) {
+    for (const file of readdirSync(join(dir, ".github/workflows"))) {
+      for (const [token] of read(dir, `.github/workflows/${file}`).matchAll(/@@[A-Z0-9_]+@@/g)) tokens.add(token);
+    }
+  }
+  assert.deepEqual([...tokens], ["@@TOFU_VERSION@@"]);
+});
+
+test("every cloudflare-opentofu workflow pins its runner image", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../skills/bootstrap/modules/cloudflare-opentofu/manifest.json", import.meta.url), "utf8"));
+  const workflows = manifest.files.map(file => file.to).filter(to => to.startsWith(".github/workflows/"));
+  assert.ok(workflows.length > 0);
+  for (const dir of [withBeta, noBeta]) {
+    for (const to of workflows) {
+      if (!existsSync(join(dir, to))) continue;
+      const runners = [...read(dir, to).matchAll(/runs-on: (\S+)/g)].map(match => match[1]);
+      assert.ok(runners.length > 0, to);
+      for (const runner of runners) assert.equal(runner, "ubuntu-24.04", to);
+    }
+  }
 });
