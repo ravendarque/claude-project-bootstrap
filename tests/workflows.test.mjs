@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { checkReleasePaths } from "../skills/bootstrap/modules/core/templates/github/scripts/check-release-paths.mjs";
 import { files, renderReal } from "./helpers.mjs";
 
@@ -30,14 +31,23 @@ test("every workflow that checks out code can read contents", () => {
 
 const runnerImages = ["ubuntu-26.04", "macos-26"];
 
-test("every job runs on an exactly pinned runner image", () => {
-  for (const [name, dir] of Object.entries(renders)) {
-    for (const wf of workflows(dir)) {
-      const runners = [...read(dir, wf).matchAll(/^\s*runs-on:\s*(.*?)\s*$/gm)].map(match => match[1]);
-      assert.ok(runners.length > 0, `${name} ${wf}`);
-      for (const runner of runners) assert.ok(runnerImages.includes(runner), `${name} ${wf}: ${runner}`);
-    }
+function assertPinnedRunners(dir, wfs, name) {
+  assert.ok(wfs.length > 0, name);
+  for (const wf of wfs) {
+    const runners = [...read(dir, wf).matchAll(/^\s*runs-on:\s*(.*?)\s*$/gm)].map(match => match[1]);
+    assert.ok(runners.length > 0, `${name} ${wf}`);
+    for (const runner of runners) assert.ok(runnerImages.includes(runner), `${name} ${wf}: ${runner}`);
   }
+}
+
+test("every job runs on an exactly pinned runner image", () => {
+  for (const [name, dir] of Object.entries(renders)) assertPinnedRunners(dir, workflows(dir), name);
+});
+
+test("this repository's own workflows run on exactly pinned runner images", () => {
+  const root = fileURLToPath(new URL("..", import.meta.url));
+  const own = readdirSync(join(root, ".github/workflows")).map(file => `.github/workflows/${file}`);
+  assertPinnedRunners(root, own, "repo");
 });
 
 test("releases only come from PRs merged into main", () => {
