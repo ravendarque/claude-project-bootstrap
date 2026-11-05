@@ -12,3 +12,4 @@ old one's status becomes "Superseded by ADR-NNNN".
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions |
 | [0002](0002-screen-dependencies-against-bds-boycott-lists.md) | Screen dependencies and vendors against BDS boycott lists |
 | [0003](0003-enforce-model-routing-with-executor-agent-and-mod.md) | Enforce model routing with an executor agent and a plugin mod |
+| [0004](0004-limit-every-subagent-spawn-to-one-at-a-time.md) | Limit every subagent spawn to one at a time |

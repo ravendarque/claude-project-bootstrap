@@ -40,10 +40,53 @@ test("two concurrent executor spawns: one forced to sonnet, one denied, slot fre
   assert.deepEqual(await spawn(), { model: "sonnet" });
 });
 
+test("two concurrent spawns of different types: exactly one allowed, one denied", async () => {
+  const { hook } = load();
+  const $ = fakeApi();
+  const results = await Promise.all([
+    hook($, { subagentType: "Explore", model: "opus" }, fakeNext),
+    hook($, { subagentType: "general-purpose", model: "haiku" }, fakeNext),
+  ]);
+  assert.equal(results.filter((r) => r.deny).length, 1);
+  assert.equal(results.filter((r) => r.model).length, 1);
+});
+
+test("a second spawn of a different type is denied while one is running", async () => {
+  const { hook } = load();
+  const busy = fakeApi([{ type: "Explore", status: "running" }]);
+  assert.ok((await hook(busy, { subagentType: EXEC }, fakeNext)).deny);
+  assert.ok((await hook(busy, { subagentType: "general-purpose" }, fakeNext)).deny);
+});
+
+test("an idle subagent does not free the slot", async () => {
+  const { hook } = load();
+  const idle = fakeApi([{ type: "general-purpose", status: "idle" }]);
+  assert.ok((await hook(idle, { subagentType: "Explore" }, fakeNext)).deny);
+});
+
+test("a completed, failed or killed subagent frees the slot", async () => {
+  const { hook } = load();
+  for (const status of ["completed", "failed", "killed"]) {
+    const done = fakeApi([{ type: "Explore", status }]);
+    assert.deepEqual(await hook(done, { subagentType: "general-purpose", model: "opus" }, fakeNext), { model: "opus" });
+  }
+});
+
+test("the executor is still forced onto sonnet", async () => {
+  const { hook } = load();
+  assert.deepEqual(await hook(fakeApi(), { subagentType: EXEC, model: "opus" }, fakeNext), { model: "sonnet" });
+});
+
+test("an allowed non-executor keeps its requested model", async () => {
+  const { hook } = load();
+  assert.deepEqual(await hook(fakeApi(), { subagentType: "Explore", model: "opus" }, fakeNext), { model: "opus" });
+  assert.deepEqual(await hook(fakeApi(), { subagentType: "Explore" }, fakeNext), { model: undefined });
+});
+
 test("a spawn denied by the list check releases the reservation", async () => {
   const { hook } = load();
   const busy = fakeApi([{ type: EXEC, status: "running" }]);
-  const denied = await hook(busy, { subagentType: EXEC }, fakeNext);
+  const denied = await hook(busy, { subagentType: "Explore" }, fakeNext);
   assert.ok(denied.deny);
   assert.deepEqual(await hook(fakeApi(), { subagentType: EXEC }, fakeNext), { model: "sonnet" });
 });
@@ -53,16 +96,16 @@ test("a failing spawn releases the reservation", async () => {
   const boom = async () => {
     throw new Error("spawn failed");
   };
-  await assert.rejects(hook(fakeApi(), { subagentType: EXEC }, boom), /spawn failed/);
+  await assert.rejects(hook(fakeApi(), { subagentType: "Explore" }, boom), /spawn failed/);
   assert.deepEqual(await hook(fakeApi(), { subagentType: EXEC }, fakeNext), { model: "sonnet" });
 });
 
-test("other agent types pass through untouched while the slot is held", async () => {
+test("any other spawn is denied while the slot is held", async () => {
   const { hook } = load();
   const $ = fakeApi();
   const held = hook($, { subagentType: EXEC }, fakeNext);
   const explore = await hook($, { subagentType: "Explore", model: "opus" }, fakeNext);
-  assert.deepEqual(explore, { model: "opus" });
+  assert.ok(explore.deny);
   await held;
 });
 
