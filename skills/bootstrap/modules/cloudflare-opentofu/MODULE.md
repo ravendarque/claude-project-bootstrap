@@ -60,8 +60,9 @@ image migration is a deliberate change.
 
 The templates hold no OpenTofu version. `infra.yml` carries the token
 `@@TOFU_VERSION@@` as `setup-opentofu`'s `tofu_version`, which the scaffold
-fills in so nothing is stale on the day of the bootstrap. The token test
-fails if one survives.
+fills in so nothing is stale on the day of the bootstrap. The render test
+checks that the template carries the token; step 3 of the scaffold checks
+that none is left after it.
 
 **Scaffold:** after rendering the initial stage, and with `<dir>` as the
 working directory. "Old enough" means published more than 72 hours ago, and a
