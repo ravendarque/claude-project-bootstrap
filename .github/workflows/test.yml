@@ -13,10 +13,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - run: npm test
+      - run: pnpm test
       - name: Rendered templates are Biome-formatted
         run: |
           dir="$(mktemp -d)"
@@ -24,8 +25,9 @@ jobs:
           node skills/bootstrap/scripts/render.mjs --modules core,js-toolchain,web-app,cloudflare-opentofu --answers "$dir/answers.json" --dest "$dir/project"
           spec="$(node -p 'require(process.argv[1]).devDependencies["@biomejs/biome"]' "$dir/project/package.json")"
           cd "$dir/project"
-          npx --yes "@biomejs/biome@$spec" format .
+          pnpm dlx "@biomejs/biome@$spec" format .
       - name: Validate plugin manifests
+        # npx, not pnpm dlx: pnpm's fetch timeout aborts the validator's 130 MB native binary download
         run: npx --yes @anthropic-ai/claude-code@2.1.310 plugin validate .
       - name: Identifier guard
         env:

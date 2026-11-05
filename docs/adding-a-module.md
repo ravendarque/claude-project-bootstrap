@@ -24,5 +24,5 @@ manual steps follow [manual-step-format.md](../skills/bootstrap/reference/manual
 7. **Test it.** Add `tests/<module>.test.mjs` with render assertions, then
    render it with its dependencies into a temporary directory and run the
    module's smoke check for real.
-8. Run `npm test` and the identifier guard, then open the PR with
+8. Run `pnpm test` and the identifier guard, then open the PR with
    `release: minor`.
