@@ -123,3 +123,28 @@ test("every required check still has a job of that name and no separate e2e work
   assert.ok(!workflows.includes(".github/workflows/e2e.yml"));
   assert.ok(!workflows.includes(".github/workflows/e2e-safari.yml"));
 });
+
+const describeTitles = path => [...read(path).matchAll(/describe\(\s*[`"]([^`"]+)[`"]/g)].map(match => match[1]);
+
+test("Safari runs only specs tagged @safari and other browsers run everything", () => {
+  const config = read("wdio.conf.js");
+  assert.match(config, /const SAFARI_TAG = "@safari"/);
+  assert.match(config, /mochaOpts: \{ timeout: 60000, \.\.\.\(safariOnly && \{ grep: SAFARI_TAG \}\) \}/);
+  assert.match(config, /selected\.length === 1 && selected\[0\] === "safari"/);
+  assert.match(config, /specs: \["\.\/e2e\/\*\*\/\*\.spec\.js"\]/);
+});
+
+test("the starter specs are tagged Classic-safe and the accessibility spec never needs BiDi under Safari", () => {
+  for (const spec of ["e2e/home.spec.js", "e2e/accessibility.spec.js"]) {
+    const titles = describeTitles(spec);
+    assert.ok(titles.length > 0, spec);
+    for (const title of titles) assert.match(title, /@safari$/, spec);
+  }
+  assert.match(read("e2e/accessibility.spec.js"), /if \(!browser\.isBidi\)/);
+});
+
+test("the standards say why Safari opts in by tag", () => {
+  const standards = read("docs/coding-standards.md");
+  assert.match(standards, /Safari runs only specs tagged `@safari`/);
+  assert.match(standards, /no WebDriver BiDi session/);
+});

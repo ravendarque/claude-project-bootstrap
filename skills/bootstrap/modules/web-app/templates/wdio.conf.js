@@ -40,6 +40,11 @@ const BROWSERS = {
 
 const selected = (process.env.E2E_BROWSERS ?? "chrome,firefox").split(",").map(name => name.trim());
 
+const SAFARI_TAG = "@safari";
+const safariOnly = selected.length === 1 && selected[0] === "safari";
+if (selected.includes("safari") && !safariOnly)
+  throw new Error("Safari runs on its own in E2E_BROWSERS: it runs only the specs tagged " + SAFARI_TAG);
+
 export const config = {
   runner: "local",
   specs: ["./e2e/**/*.spec.js"],
@@ -52,7 +57,7 @@ export const config = {
   logLevel: "warn",
   framework: "mocha",
   reporters: ["spec"],
-  mochaOpts: { timeout: 60000 },
+  mochaOpts: { timeout: 60000, ...(safariOnly && { grep: SAFARI_TAG }) },
   async onPrepare() {
     if (await answers(BASE_URL))
       throw new SevereServiceError(`Something is already serving ${BASE_URL}; stop it first`);

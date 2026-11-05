@@ -16,7 +16,7 @@ async function violations() {
 }
 
 for (const colorScheme of ["light", "dark"]) {
-  describe(`${colorScheme} theme at phone width`, () => {
+  describe(`${colorScheme} theme at phone width @safari`, () => {
     before(async function () {
       if (!browser.isBidi) {
         // Safari speaks classic WebDriver only, which can't emulate a colour scheme or set the viewport.
