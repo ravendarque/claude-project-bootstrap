@@ -97,3 +97,48 @@ test("every cloudflare-opentofu workflow pins its runner image", () => {
     }
   }
 });
+
+const moduleDoc = readFileSync(new URL("../skills/bootstrap/modules/cloudflare-opentofu/MODULE.md", import.meta.url), "utf8");
+const skillDoc = readFileSync(new URL("../skills/bootstrap/SKILL.md", import.meta.url), "utf8");
+const section = (text, heading) => {
+  const start = text.indexOf(heading);
+  assert.ok(start >= 0, heading);
+  const next = text.indexOf("\n## ", start + heading.length);
+  return text.slice(start, next < 0 ? undefined : next);
+};
+
+test("environments are created on every plan and each is verified after creation", () => {
+  const config = section(moduleDoc, "## 4. GitHub configuration");
+  assert.match(config, /on every plan/);
+  assert.match(config, /gh api repos\/\$R\/environments\/<env> --jq '\.deployment_branch_policy'/);
+  assert.match(config, /"custom_branch_policies":true/);
+  assert.match(config, /repos\/\$R\/environments\/<env>\/deployment-branch-policies --jq/);
+  for (const expected of ['["branch:main"]', '["branch:main","tag:v*"]', '["tag:v*"]']) assert.ok(config.includes(expected), expected);
+});
+
+test("the repository-level fallback is conditional on the check failing", () => {
+  const config = section(moduleDoc, "## 4. GitHub configuration");
+  assert.match(config, /Fallback, only if a create or a verification above fails/);
+  assert.match(config, /state\.mjs skip <dir> github:cloudflare-opentofu:1/);
+  assert.match(config, /docs\/threat-model\.md/);
+  assert.match(config, /offer the plan upgrade/);
+  assert.doesNotMatch(section(moduleDoc, "## 3. Files"), /threat-model/);
+  assert.doesNotMatch(moduleDoc, /Free private repository only/);
+  assert.doesNotMatch(moduleDoc, /environments aren't available, so/);
+});
+
+test("secret commands use --env normally and repository level only on the fallback", () => {
+  const manual = section(moduleDoc, "## 5. Manual steps");
+  assert.match(manual, /CLOUDFLARE_DEPLOY_TOKEN --repo \$R --env production/);
+  assert.match(manual, /CLOUDFLARE_INFRA_APPLY_TOKEN --repo \$R --env infra/);
+  assert.match(manual, /TF_STATE_ACCESS_KEY_ID --repo \$R --env infra/);
+  assert.match(manual, /recorded an environment as skipped/);
+  assert.doesNotMatch(manual, /On a free private repo/);
+});
+
+test("the bootstrap skill checks environments on a free private repo rather than assuming", () => {
+  const plan = skillDoc.slice(skillDoc.indexOf("**`plan-confirmed`**"), skillDoc.indexOf("**`scaffold`**"));
+  assert.doesNotMatch(plan, /environment secrets aren't available/);
+  assert.match(plan, /checks\s+rather than assumes/);
+  assert.match(plan, /only if that check fails/);
+});
