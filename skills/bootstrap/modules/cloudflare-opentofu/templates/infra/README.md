@@ -62,6 +62,13 @@ Create two R2 API tokens (R2 → Manage R2 API Tokens), both limited to the
 PR plans run with the read-only pair, so code in a pull request can't
 rewrite state.
 
+### OpenTofu version
+
+`infra.yml` pins OpenTofu exactly in `tofu_version`. Dependabot doesn't bump
+it. To upgrade, take the newest `opentofu/opentofu` release that is more than
+72 hours old (not a pre-release), change `tofu_version`, and run the same
+version locally.
+
 ### Variables
 
 `CLOUDFLARE_ACCOUNT_ID` as a repository variable. It isn't confidential.
