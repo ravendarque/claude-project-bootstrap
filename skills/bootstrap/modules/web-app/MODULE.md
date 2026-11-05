@@ -18,9 +18,11 @@ None.
   and axe-core; scripts `dev`, `build`, `preview`, `test:e2e` and
   `e2e:server`, which serves the built app for the e2e run) and
   `tsconfig.json` (adds the DOM library); `vite.config.js`, `wdio.conf.js`,
-  `e2e/accessibility.spec.js`, `.github/workflows/e2e.yml`,
-  `.github/workflows/e2e-safari.yml` (public repos only: macOS minutes are
-  billed at ten times the Linux rate on private ones),
+  `e2e/accessibility.spec.js`,
+  `.github/workflows/test.yml` (replaces js-toolchain's: the same `lint`,
+  `typecheck` and `test` jobs, plus the browser runs; the Safari run is for
+  public repos only, as macOS minutes are billed at ten times the Linux rate
+  on private ones),
   `.github/workflows/release-artefacts.yml` (when a release is published,
   builds it and attaches `dist/` as `<slug>-dist.zip`),
   `.claude/launch.json`. `wdio.conf.js` starts the server with
@@ -28,6 +30,14 @@ None.
   makes pnpm print `[ELIFECYCLE] Command failed.` on a passing run.
 - Application (first PR, `stage: app`): `index.html`, `src/main.js`,
   `e2e/home.spec.js`.
+
+The browser runs (`e2e-run`, and `e2e-safari-run` on public repos) need
+`lint` and `typecheck`, so a push that fails a quick check never starts a
+browser. They don't wait for `test`: that would add the unit tests' run time
+to every green PR. The required checks `e2e` and `e2e-safari` are small jobs
+that need the quick checks and the browser run, and fail with the reason when
+the run was skipped, because a skipped required check would pass. The shared
+jobs stay identical to js-toolchain's, which a render test enforces.
 
 **Scaffold:** as js-toolchain's (install, then format).
 

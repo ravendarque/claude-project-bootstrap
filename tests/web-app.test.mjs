@@ -5,7 +5,18 @@ import { join } from "node:path";
 import { brokenLinks, files, renderReal } from "./helpers.mjs";
 
 const dest = renderReal(["web-app"]);
+const jsDest = renderReal(["js-toolchain"]);
 const read = path => readFileSync(join(dest, path), "utf8");
+
+function jobs(text) {
+  const body = text.slice(text.indexOf("\njobs:\n") + 7);
+  return Object.fromEntries(
+    body
+      .split(/^(?=  [a-z0-9-]+:$)/m)
+      .filter(block => block.trim())
+      .map(block => [block.match(/^  ([a-z0-9-]+):$/m)[1], block.trimEnd()]),
+  );
+}
 
 test("web-app merges browser tooling into js-toolchain's package.json", () => {
   const pkg = JSON.parse(read("package.json"));
@@ -19,7 +30,7 @@ test("the e2e suite runs in Chromium and Firefox", () => {
   const config = read("wdio.conf.js");
   assert.match(config, /browserName: "chrome"/);
   assert.match(config, /browserName: "firefox"/);
-  assert.doesNotMatch(read(".github/workflows/e2e.yml"), /playwright/);
+  assert.doesNotMatch(read(".github/workflows/test.yml"), /playwright/);
 });
 
 test("the accessibility spec checks WCAG 2.2 AA at phone width in both themes", () => {
@@ -57,7 +68,7 @@ test("links resolve", () => {
 const privateDest = renderReal(["web-app"], { visibility: "private" });
 
 test("public repos run Safari on macOS as a required check", () => {
-  const safari = read(".github/workflows/e2e-safari.yml");
+  const safari = jobs(read(".github/workflows/test.yml"))["e2e-safari-run"];
   assert.match(safari, /runs-on: macos-latest/);
   assert.match(safari, /sudo safaridriver --enable/);
   assert.match(safari, /E2E_BROWSERS: safari/);
@@ -67,6 +78,8 @@ test("public repos run Safari on macOS as a required check", () => {
 });
 
 test("private repos don't run Safari", () => {
+  const privateTest = readFileSync(join(privateDest, ".github/workflows/test.yml"), "utf8");
+  assert.deepEqual(Object.keys(jobs(privateTest)), ["lint", "typecheck", "test", "e2e-run", "e2e"]);
   assert.ok(![...files(privateDest)].includes(".github/workflows/e2e-safari.yml"));
   const checks = JSON.parse(readFileSync(join(privateDest, ".bootstrap/github/ruleset.json"), "utf8")).rules.find(
     r => r.type === "required_status_checks",
@@ -78,4 +91,35 @@ test("the e2e config picks browsers from E2E_BROWSERS, defaulting to Chromium an
   const config = read("wdio.conf.js");
   assert.match(config, /process\.env\.E2E_BROWSERS \?\? "chrome,firefox"/);
   assert.match(config, /safari: \{ browserName: "safari" \}/);
+});
+
+test("web-app's test.yml keeps js-toolchain's lint, typecheck and test jobs identical", () => {
+  const shared = jobs(readFileSync(join(jsDest, ".github/workflows/test.yml"), "utf8"));
+  assert.deepEqual(Object.keys(shared), ["lint", "typecheck", "test"]);
+  for (const text of [read(".github/workflows/test.yml"), readFileSync(join(privateDest, ".github/workflows/test.yml"), "utf8")]) {
+    const combined = jobs(text);
+    for (const [id, job] of Object.entries(shared)) assert.equal(combined[id], job, id);
+  }
+});
+
+test("the e2e jobs wait for lint and typecheck, and the required checks fail with a reason when gated", () => {
+  const combined = jobs(read(".github/workflows/test.yml"));
+  for (const run of ["e2e-run", "e2e-safari-run"]) assert.match(combined[run], /needs: \[lint, typecheck\]/, run);
+  assert.doesNotMatch(combined["e2e-run"], /needs:.*\btest\b/);
+  for (const [check, run] of [["e2e", "e2e-run"], ["e2e-safari", "e2e-safari-run"]]) {
+    assert.match(combined[check], /if: \$\{\{ !cancelled\(\) \}\}/, check);
+    assert.match(combined[check], new RegExp(`needs: \\[lint, typecheck, ${run}\\]`), check);
+    assert.match(combined[check], /::error::.*did not run because a quick check failed/, check);
+    assert.match(combined[check], /exit 1/, check);
+  }
+});
+
+test("every required check still has a job of that name and no separate e2e workflow remains", () => {
+  const checks = JSON.parse(read(".bootstrap/github/ruleset.json")).rules.find(r => r.type === "required_status_checks")
+    .parameters.required_status_checks.map(c => c.context);
+  const combined = Object.keys(jobs(read(".github/workflows/test.yml")));
+  for (const check of checks.filter(c => c !== "check-label")) assert.ok(combined.includes(check), check);
+  const workflows = [...files(dest)].filter(f => f.startsWith(".github/workflows/"));
+  assert.ok(!workflows.includes(".github/workflows/e2e.yml"));
+  assert.ok(!workflows.includes(".github/workflows/e2e-safari.yml"));
 });

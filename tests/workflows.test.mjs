@@ -139,3 +139,31 @@ test("dependabot also updates the composite action's pinned actions", () => {
 test("cloudflare dev serves on the port the launch config expects", () => {
   assert.match(JSON.parse(read(renders.cfBeta, "package.json")).scripts.dev, /--port 5173/);
 });
+
+const triggers = text => text.match(/^on:\n((?:  .*\n|\n)+)/m)[1];
+
+test("every workflow that runs PR checks cancels superseded runs, and never cancels pushes or releases", () => {
+  const all = { ...renders, python: renderReal(["python-toolchain"]) };
+  const exempt = new Set(["project-status-sync.yml", "release.yml"]);
+  let checked = 0;
+  for (const [name, dir] of Object.entries(all)) {
+    for (const wf of workflows(dir)) {
+      const text = read(dir, wf);
+      const where = `${name} ${wf}`;
+      const cancel = text.match(/^concurrency:\n  group: .+\n  cancel-in-progress: (.+)$/m)?.[1];
+      const onPullRequest = /^  pull_request:/m.test(triggers(text));
+      if (!onPullRequest) {
+        if (cancel !== undefined) assert.equal(cancel, "false", where);
+        continue;
+      }
+      if (exempt.has(wf.split("/").pop())) continue;
+      checked++;
+      const otherTriggers = triggers(text).match(/^  [a-z_]+:/gm).filter(t => t !== "  pull_request:");
+      assert.ok(cancel, where);
+      if (otherTriggers.length === 0) assert.equal(cancel, "true", where);
+      else assert.equal(cancel, "${{ github.event_name == 'pull_request' }}", where);
+    }
+  }
+  assert.ok(checked >= 8, String(checked));
+  assert.match(read(renders.core, ".github/workflows/release.yml"), /cancel-in-progress: false/);
+});
