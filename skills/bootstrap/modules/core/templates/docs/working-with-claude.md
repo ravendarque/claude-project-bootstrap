@@ -1,23 +1,27 @@
 # Working with Claude
 
-How Claude sessions are run on this project, to get good results without
-spending tokens on work that doesn't need the most capable model.
+How Claude is run on this project, to get good results without spending
+tokens on work that doesn't need the most capable model.
 
 ## Model routing
 
-Subagents for scripted work, sessions for open-ended work.
+One Sonnet-class subagent does all delegated work, one at a time.
 
 - **The main session runs an Opus-class model.** It owns design, scoping
   issues, architecture decisions, review judgement, anything security- or
-  privacy-sensitive, and the final verification before anything is called
-  done.
-- **Scripted work goes to at most one Sonnet-class subagent at a time**
+  privacy-sensitive, approvals, and the final verification before anything
+  is called done.
+- **All delegated work goes to at most one Sonnet-class subagent at a time**
   (`model: sonnet`): dependency bumps, running test suites and reporting
   their output, board and label housekeeping, executing an agreed plan step
-  by step, bulk renames, doc updates from a settled decision, and digging
-  through CI logs.
-- **Open-ended work gets its own session**: anything that needs a decision
-  along the way, a long-running investigation or its own branch and PR.
+  by step, bulk renames, doc updates from a settled decision, digging
+  through CI logs, and longer investigations.
+- **No sub-sessions, no mix of sessions and subagents, and no parallel
+  workers**, even when their files don't overlap. Sub-sessions can't be
+  governed the same way, and extra or parallel agents use up subscription
+  token limits too quickly.
+- **Long or open-ended work is split into sequential subagent runs.** The
+  main session decides between them.
 - **Follow-ups go to the existing subagent**, not a new one.
 - **A subagent gets its own worktree whenever it writes code**, and it and
   the main session never write the same files.
