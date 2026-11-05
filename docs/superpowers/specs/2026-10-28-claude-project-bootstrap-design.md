@@ -197,15 +197,14 @@ Each `MODULE.md` declares, in fixed sections:
 - Model routing rule in `CLAUDE.md`:
   - Main session on Opus owns design, scoping, architecture, review judgement,
     security/privacy-sensitive work and final verification.
-  - At most one linked Sonnet session at a time (desktop app) takes mechanical
+  - At most one subagent with `model: sonnet` at a time takes all delegated
     work: dependency bumps, running suites and reporting output, board/label
     housekeeping, executing an agreed plan step by step, bulk renames, doc
-    updates from settled decisions, CI log digging. Follow-ups go to the
-    existing session, not a new one; it gets its own worktree when it writes
-    code; the two never write the same files. Opus checks its results before
-    reporting them.
-  - Fallback where linked sessions don't exist (CLI, web): at most one
-    subagent with `model: sonnet` at a time, same split.
+    updates from settled decisions, CI log digging. No sub-sessions and no
+    parallel workers; long work is split into sequential runs, with Opus
+    deciding between them. Follow-ups go to the existing subagent, not a new
+    one; it gets its own worktree when it writes code; the two never write
+    the same files. Opus checks its results before reporting them.
   - Briefs are self-contained; slow commands run in the foreground.
 - Memory convention: one fact per file, `MEMORY.md` as a one-line index.
 - Generic operational lessons included in `docs/workflow.md`/`CLAUDE.md`:
@@ -332,8 +331,8 @@ itself is published under the same licence.
 - Dogfood: use the skill to create its own repo.
 - Release artefact attached to the GitHub Release; for this repo, whatever is
   easiest to install the skill (the plugin zip + marketplace install).
-- Model routing: Opus main, at most one nested Sonnet session for work that
-  doesn't need Opus; subagent fallback where sessions don't exist.
+- Model routing: Opus main, at most one Sonnet subagent at a time for all
+  delegated work; no sub-sessions.
 - The standard licence for all the author's work, generalised, included in
   the bootstrap.
 - Licence named "Ravendarque Noncommercial Licence"; notice uses the GitHub
@@ -377,7 +376,7 @@ itself is published under the same licence.
   it, so there are no same-named duplicates.
 - **Model routing is a default section in the generated `CLAUDE.md`**, edited
   per project like any other line. It names tiers ("Opus-class main session",
-  "Sonnet-class nested session") so it doesn't need rewriting at every model
+  "Sonnet-class subagent") so it doesn't need rewriting at every model
   release.
 - **Resumability**: `.bootstrap/state.json` records completed steps. On
   resume, an incomplete step attempts its create and treats "already exists"
