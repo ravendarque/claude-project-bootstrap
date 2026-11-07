@@ -38,6 +38,14 @@ test("the coding standards gain the JavaScript section", () => {
   assert.match(read("docs/coding-standards.md"), /### JavaScript toolchain/);
 });
 
+test("Node is pinned to an exact release in .nvmrc, which CI reads", () => {
+  assert.match(read(".nvmrc"), /^\d+\.\d+\.\d+\n$/);
+  const action = read(".github/actions/setup-node-pnpm/action.yml");
+  assert.match(action, /node-version-file: \.nvmrc/);
+  assert.doesNotMatch(action, /node-version:/);
+  assert.match(read("docs/coding-standards.md"), /`\.nvmrc`/);
+});
+
 test("links still resolve with the module added", () => {
   assert.deepEqual(brokenLinks(dest), []);
 });

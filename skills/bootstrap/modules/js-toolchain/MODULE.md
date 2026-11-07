@@ -16,7 +16,7 @@ None.
 
 - Tooling (initial commit): `package.json`, `pnpm-workspace.yaml` (its
   `allowBuilds` list is built from every selected module's decisions),
-  `.npmrc`, `biome.json`, `tsconfig.json`, `vitest.config.js`,
+  `.npmrc`, `.nvmrc`, `biome.json`, `tsconfig.json`, `vitest.config.js`,
   `.github/actions/setup-node-pnpm`, `.github/workflows/test.yml`,
   `.github/dependabot.yml` (replaces core's, adding npm).
 - Application (first PR, `stage: app`): `src/greeting.js`,
