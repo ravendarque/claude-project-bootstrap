@@ -16,18 +16,40 @@ None.
 
 - Tooling (initial commit): `package.json`, `pnpm-workspace.yaml` (its
   `allowBuilds` list is built from every selected module's decisions),
-  `.npmrc`, `biome.json`, `tsconfig.json`, `vitest.config.js`,
+  `.npmrc`, `.nvmrc`, `biome.json`, `tsconfig.json`, `vitest.config.js`,
   `.github/actions/setup-node-pnpm`, `.github/workflows/test.yml`,
   `.github/dependabot.yml` (replaces core's, adding npm).
 - Application (first PR, `stage: app`): `src/greeting.js`,
   `test/greeting.test.js`.
 
-**Scaffold:** after rendering the initial stage, run `pnpm install` in the
-project so `pnpm-lock.yaml` goes into the initial commit (CI installs with
-`--frozen-lockfile`), then `pnpm format` so generated JSON matches Biome's
-style. Do the same after rendering the app stage. Before committing, check
-the latest stable versions (`pnpm outdated`); if the template's ranges are
-behind, raise it for the plugin's own PR process.
+`.nvmrc` holds no version. It carries the `@@NODE_VERSION@@` token, which the
+scaffold fills in so the project doesn't start on a stale Node.
+
+**Scaffold:** after rendering the initial stage, with `<dir>` as the working
+directory:
+
+1. **Resolve Node.** Take the newest LTS release published more than 72
+   hours ago (the date in the index is a day, so count from its end), which
+   is the newest release on the newest Active LTS line:
+
+   ```bash
+   curl -fsSL https://nodejs.org/dist/index.json | jq -r '[.[] | select(.lts != false and ((.date + "T23:59:59Z") | fromdateiso8601) < (now - 259200))] | max_by(.version | ltrimstr("v") | split(".") | map(tonumber)) | .version | ltrimstr("v")'
+   ```
+
+   Continue only if it printed a version (`X.Y.Z`); anything else, including
+   `null` or nothing, means the fetch failed, so stop and report it. Replace
+   `@@NODE_VERSION@@` in `.nvmrc` with it.
+2. **Use that Node.** Make it the active Node (`nvm use`, `fnm use`, or
+   prefix each command with `mise exec node@<version> --`) and check that
+   `node --version` prints `v<version>`. If no version manager can provide
+   it, tell the user and stop: the lockfile and checks must come from the
+   Node CI runs.
+3. Run `pnpm install` so `pnpm-lock.yaml` goes into the initial commit (CI
+   installs with `--frozen-lockfile`), then `pnpm format` so generated JSON
+   matches Biome's style. Do the same after rendering the app stage.
+4. Before committing, check the latest stable versions (`pnpm outdated`); if
+   the template's ranges are behind, raise it for the plugin's own PR
+   process.
 
 ## 4. GitHub configuration
 
@@ -44,6 +66,6 @@ None.
 
 ## 7. Smoke check
 
-On the full render:
+On the full render, scaffolded as above:
 `pnpm install && pnpm format && pnpm lint && pnpm typecheck && pnpm test`.
-All exit 0.
+All exit 0. Run it with the Node in `.nvmrc`, not the machine's own.
