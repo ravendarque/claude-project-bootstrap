@@ -1,0 +1,223 @@
+{
+  "name": "android-toolchain",
+  "dependsOn": [],
+  "conflictsWith": [
+    "js-toolchain",
+    "python-toolchain",
+    "web-app",
+    "cloudflare-opentofu"
+  ],
+  "questions": [
+    {
+      "key": "application_id",
+      "type": "application_id",
+      "prompt": "What is the Android application id (lower-case reverse domain, such as org.example.app)? It identifies the app to Android and can't change once a release is installed."
+    }
+  ],
+  "overrides": [
+    ".github/dependabot.yml"
+  ],
+  "files": [
+    {
+      "from": "templates/settings.gradle.kts",
+      "to": "settings.gradle.kts"
+    },
+    {
+      "from": "templates/build.gradle.kts",
+      "to": "build.gradle.kts"
+    },
+    {
+      "from": "templates/gradle.properties",
+      "to": "gradle.properties"
+    },
+    {
+      "from": "templates/editorconfig",
+      "to": ".editorconfig"
+    },
+    {
+      "from": "templates/gradle/libs.versions.toml",
+      "to": "gradle/libs.versions.toml"
+    },
+    {
+      "from": "templates/gradle/wrapper/gradle-wrapper.properties",
+      "to": "gradle/wrapper/gradle-wrapper.properties"
+    },
+    {
+      "from": "templates/gradle/wrapper/gradle-wrapper.jar",
+      "to": "gradle/wrapper/gradle-wrapper.jar"
+    },
+    {
+      "from": "templates/gradlew",
+      "to": "gradlew"
+    },
+    {
+      "from": "templates/gradlew.bat",
+      "to": "gradlew.bat"
+    },
+    {
+      "from": "templates/config/detekt/detekt.yml",
+      "to": "config/detekt/detekt.yml"
+    },
+    {
+      "from": "templates/core/build.gradle.kts",
+      "to": "core/build.gradle.kts"
+    },
+    {
+      "from": "templates/app/build.gradle.kts",
+      "to": "app/build.gradle.kts"
+    },
+    {
+      "from": "templates/app/proguard-rules.pro",
+      "to": "app/proguard-rules.pro"
+    },
+    {
+      "from": "templates/github/workflows/test.yml",
+      "to": ".github/workflows/test.yml"
+    },
+    {
+      "from": "templates/github/workflows/release-artefacts.yml",
+      "to": ".github/workflows/release-artefacts.yml"
+    },
+    {
+      "from": "templates/github/dependabot.yml",
+      "to": ".github/dependabot.yml"
+    },
+    {
+      "from": "templates/core/src/main/kotlin/Greeting.kt",
+      "to": "core/src/main/kotlin/{{application_id_path}}/core/Greeting.kt",
+      "stage": "app"
+    },
+    {
+      "from": "templates/core/src/test/kotlin/GreetingTest.kt",
+      "to": "core/src/test/kotlin/{{application_id_path}}/core/GreetingTest.kt",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/AndroidManifest.xml",
+      "to": "app/src/main/AndroidManifest.xml",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/res/values/strings.xml",
+      "to": "app/src/main/res/values/strings.xml",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/res/values/themes.xml",
+      "to": "app/src/main/res/values/themes.xml",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/res/values/colors.xml",
+      "to": "app/src/main/res/values/colors.xml",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/res/xml/backup_rules.xml",
+      "to": "app/src/main/res/xml/backup_rules.xml",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/res/xml/data_extraction_rules.xml",
+      "to": "app/src/main/res/xml/data_extraction_rules.xml",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/res/mipmap-anydpi/ic_launcher.xml",
+      "to": "app/src/main/res/mipmap-anydpi/ic_launcher.xml",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/res/drawable/ic_launcher_foreground.xml",
+      "to": "app/src/main/res/drawable/ic_launcher_foreground.xml",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/main/kotlin/MainActivity.kt",
+      "to": "app/src/main/kotlin/{{application_id_path}}/MainActivity.kt",
+      "stage": "app"
+    },
+    {
+      "from": "templates/app/src/test/kotlin/GreetingScreenTest.kt",
+      "to": "app/src/test/kotlin/{{application_id_path}}/GreetingScreenTest.kt",
+      "stage": "app"
+    }
+  ],
+  "requiredChecks": [
+    "check"
+  ],
+  "releasePaths": {
+    "noneAllowed": [
+      "app/src/test/",
+      "core/src/test/",
+      "config/detekt/",
+      ".editorconfig"
+    ],
+    "noneForbidden": []
+  },
+  "claudeIndexLines": [
+    "- A native Android app in Kotlin with Jetpack Compose, built with Gradle (JDK 21) and checked with Spotless/ktlint, detekt, Android Lint, Robolectric and Roborazzi: [coding standards](docs/coding-standards.md#android-toolchain). Run `./gradlew check` before pushing; it's exactly what CI runs."
+  ],
+  "screening": [
+    {
+      "dependency": "Android SDK, Android Gradle Plugin, Jetpack (AndroidX, Compose), Android Lint, Android Studio and emulator images",
+      "maintainer": "Google",
+      "listed": "Y",
+      "note": "Google is a pressure target in the BDS boycott guide and a No Tech for Apartheid target (Project Nimbus). Free, industry standard, and there is no viable alternative for building a native Android app: allowed under the free-tool exception. Nothing is paid; there is no Google Play listing."
+    },
+    {
+      "dependency": "Robolectric",
+      "maintainer": "Google (open source, Robolectric project)",
+      "listed": "Y",
+      "note": "MIT licence, maintained by Google engineers. Free, dev-only, and the only maintained way to run Android UI tests on the JVM: allowed under the free-tool exception."
+    },
+    {
+      "dependency": "Kotlin and the Kotlin Gradle plugins",
+      "maintainer": "JetBrains",
+      "listed": "N",
+      "note": "Apache-2.0 licence."
+    },
+    {
+      "dependency": "Gradle and gradle/actions",
+      "maintainer": "Gradle Inc.",
+      "listed": "N",
+      "note": "Apache-2.0 and MIT licences. CI uses setup-gradle's open-source basic cache provider, not the proprietary enhanced one."
+    },
+    {
+      "dependency": "Eclipse Temurin (JDK 21)",
+      "maintainer": "Eclipse Adoptium (Eclipse Foundation)",
+      "listed": "N",
+      "note": "GPL-2.0 with Classpath Exception."
+    },
+    {
+      "dependency": "Roborazzi",
+      "maintainer": "takahirom (independent open source maintainer)",
+      "listed": "N",
+      "note": "Apache-2.0 licence. Dev-only."
+    },
+    {
+      "dependency": "ktlint",
+      "maintainer": "ktlint project (community open source, started at Pinterest)",
+      "listed": "N",
+      "note": "MIT licence. Dev-only."
+    },
+    {
+      "dependency": "detekt",
+      "maintainer": "detekt project (community open source)",
+      "listed": "N",
+      "note": "Apache-2.0 licence. Dev-only."
+    },
+    {
+      "dependency": "Spotless",
+      "maintainer": "DiffPlug (open source)",
+      "listed": "N",
+      "note": "Apache-2.0 licence. Dev-only."
+    },
+    {
+      "dependency": "JUnit 4",
+      "maintainer": "JUnit team (community open source)",
+      "listed": "N",
+      "note": "EPL-1.0 licence. Dev-only."
+    }
+  ]
+}

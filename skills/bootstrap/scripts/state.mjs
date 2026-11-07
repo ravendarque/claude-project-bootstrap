@@ -33,6 +33,15 @@ export function saveRun(dir, { answers, modules }) {
 
 const HOSTNAME = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
+const APPLICATION_ID = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+const RESERVED_SEGMENTS = new Set(
+  "abstract as assert boolean break byte case catch char class const continue default do double else enum extends false final finally float for fun goto if implements import in instanceof int interface is long native new null object package private protected public return short static strictfp super switch synchronized this throw throws transient true try typealias typeof val var void volatile when while".split(" "),
+);
+
+function isApplicationId(value) {
+  return APPLICATION_ID.test(value) && value.split(".").every(segment => !RESERVED_SEGMENTS.has(segment));
+}
+
 const GITHUB_PLANS = ["free", "pro", "team", "enterprise"];
 
 function checkQuestions(input, manifests) {
@@ -48,6 +57,8 @@ function checkQuestions(input, manifests) {
       throw new Error(`${key} is required`);
     } else if (type === "hostname" && !HOSTNAME.test(value)) {
       throw new Error(`${key} must be a domain name such as example.com`);
+    } else if (type === "application_id" && !isApplicationId(value)) {
+      throw new Error(`${key} must be a lower-case reverse domain such as org.example.app, with no Java or Kotlin keyword as a segment`);
     }
   }
 }

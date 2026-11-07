@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: Set up a new project from an empty directory - GitHub repo, branch protection, project board, CI, tag-based releases, coding standards, privacy and security docs, and Claude configuration - from selectable modules (core, js-toolchain, python-toolchain, web-app, cloudflare-opentofu). Use when the user asks to bootstrap, scaffold or set up a new project or repository.
+description: Set up a new project from an empty directory - GitHub repo, branch protection, project board, CI, tag-based releases, coding standards, privacy and security docs, and Claude configuration - from selectable modules (core, js-toolchain, python-toolchain, android-toolchain, web-app, cloudflare-opentofu). Use when the user asks to bootstrap, scaffold or set up a new project or repository.
 ---
 
 # Bootstrap a project
@@ -94,10 +94,11 @@ steps count as settled. Before re-running a create:
      `Ravendarque (https://github.com/ravendarque)`; never a real name
      unless the user insists;
    - modules: `core` is always on; offer `js-toolchain` (any JavaScript
-     project) or `python-toolchain` (any Python project) as the project's
-     one stack, never both; then `web-app` (a browser app; needs
+     project), `python-toolchain` (any Python project) or
+     `android-toolchain` (a native Android app) as the project's one stack,
+     never more than one; then `web-app` (a browser app; needs
      `js-toolchain`) and `cloudflare-opentofu` (needs `web-app`), which
-     rule out `python-toolchain`;
+     rule out the other two stacks;
    - each selected module's questions from its MODULE.md.
 
    Write the answers to a temporary JSON file and run

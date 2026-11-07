@@ -14,6 +14,7 @@ const renders = {
   web: renderReal(["web-app"]),
   webPrivate: renderReal(["web-app"], { visibility: "private" }),
   python: renderReal(["python-toolchain"]),
+  android: renderReal(["android-toolchain"], { application_id: "org.example.sample" }),
   cfBeta: renderReal(["cloudflare-opentofu"], { ...cf, beta: true }),
   cfNoBeta: renderReal(["cloudflare-opentofu"], { ...cf, beta: false }),
 };
@@ -54,7 +55,7 @@ test("releases only come from PRs merged into main", () => {
   assert.match(read(renders.core, ".github/workflows/release.yml"), /types: \[closed\]\n\s+branches: \[main\]/);
 });
 
-const releaseLabelsByEcosystem = { "github-actions": "release: none", npm: "release: patch", uv: "release: patch" };
+const releaseLabelsByEcosystem = { "github-actions": "release: none", npm: "release: patch", uv: "release: patch", gradle: "release: patch" };
 
 function dependabotUpdates(text) {
   return text
@@ -67,7 +68,7 @@ function dependabotUpdates(text) {
 }
 
 test("every dependabot update carries exactly the release label for its ecosystem", () => {
-  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renders.python };
+  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renders.python, android: renders.android };
   for (const [name, dir] of Object.entries(combinations)) {
     const updates = dependabotUpdates(read(dir, ".github/dependabot.yml"));
     assert.ok(updates.length > 0, name);
@@ -86,7 +87,7 @@ test("the labels dependabot applies are ones core creates", () => {
 
 test("a release: none actions bump passes the path guard in every combination", () => {
   const bumped = [".github/workflows/test.yml", ".github/workflows/release.yml", ".github/actions/setup-node-pnpm/action.yml"];
-  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renders.python };
+  const combinations = { core: renders.core, js: renders.js, web: renders.web, cf: renders.cfBeta, python: renders.python, android: renders.android };
   for (const [name, dir] of Object.entries(combinations)) {
     const { ok, offending } = checkReleasePaths(bumped, JSON.parse(read(dir, ".github/release-paths.json")));
     assert.ok(ok, `${name}: ${offending}`);

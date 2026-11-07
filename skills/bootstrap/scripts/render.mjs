@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 
-const BINARY = /\.(png|ico|jpg|jpeg|gif|webp|woff2?|zip|pem)$/i;
+const BINARY = /\.(png|ico|jpg|jpeg|gif|webp|woff2?|zip|pem|jar)$/i;
 const PLACEHOLDER = /(?<!\$)\{\{\s*([a-z0-9_]+)\s*\}\}/g;
 
 function loadManifest(name, modulesDir) {
@@ -71,6 +71,15 @@ function escapeHtml(text) {
   return text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
+function kotlinString(text) {
+  return JSON.stringify(text).replace(/\\.|\$/g, m => ({ $: "\\$", "\\f": "\\u000C" })[m] ?? m);
+}
+
+function androidString(text) {
+  const escaped = text.replace(/[\\'"]/g, c => `\\${c}`).replace(/^[@?]/, c => `\\${c}`);
+  return escaped.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+}
+
 export function validateAnswers(input, { maxSlugLength: limit = 63 } = {}) {
   const name = String(input.name ?? "").trim();
   if (!name) throw new Error("Project name is required");
@@ -96,6 +105,10 @@ export function validateAnswers(input, { maxSlugLength: limit = 63 } = {}) {
     greeting_js: JSON.stringify(`Hello from ${name}`),
     description_toml: JSON.stringify(String(input.description ?? "")),
     python_package: pythonPackage(slug),
+    name_kotlin: kotlinString(name),
+    greeting_kotlin: kotlinString(`Hello from ${name}`),
+    name_android: androidString(name),
+    ...(typeof input.application_id === "string" && { application_id_path: input.application_id.replace(/\./g, "/") }),
   };
   return { answers, slug };
 }
@@ -198,6 +211,7 @@ export function render({ modules, answers, modulesDir, destDir, dryRun = false, 
   const outputs = new Map();
   const owners = new Map();
   const mergers = new Map();
+  const executables = new Set();
   for (const module of modules) {
     for (const file of module.files ?? []) {
       if (!included(file, answers)) continue;
@@ -227,6 +241,8 @@ export function render({ modules, answers, modulesDir, destDir, dryRun = false, 
       }
       owners.set(rel, module.name);
       outputs.set(rel, content);
+      if (statSync(source).mode & 0o111) executables.add(rel);
+      else executables.delete(rel);
     }
   }
   for (const rel of outputs.keys()) {
@@ -239,6 +255,7 @@ export function render({ modules, answers, modulesDir, destDir, dryRun = false, 
       const target = join(root, rel);
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, content);
+      if (executables.has(rel)) chmodSync(target, 0o755);
     }
   }
   return [...outputs.keys()];

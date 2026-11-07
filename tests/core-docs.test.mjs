@@ -71,10 +71,16 @@ test("gitignore keeps secrets and tool state out and config in", () => {
     "src/app/__pycache__/x.pyc",
     ".pytest_cache/x",
     ".ruff_cache/x",
+    ".gradle/x",
+    ".kotlin/x",
+    "app/build/x",
+    "local.properties",
+    "upload.jks",
+    "release.keystore",
   ]) {
     assert.ok(ignored(path), `${path} should be ignored`);
   }
-  for (const path of ["infra/terraform.tfvars.example", "infra/.terraform.lock.hcl", ".claude/settings.json", ".env.example"]) {
+  for (const path of ["infra/terraform.tfvars.example", "infra/.terraform.lock.hcl", ".claude/settings.json", ".env.example", "gradle/wrapper/gradle-wrapper.jar", "app/src/test/screenshots/x.png"]) {
     assert.ok(!ignored(path), `${path} should stay tracked`);
   }
 });

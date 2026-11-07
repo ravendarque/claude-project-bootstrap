@@ -114,6 +114,16 @@ test("saveAnswers rejects a zone that isn't a hostname", () => {
   );
 });
 
+test("saveAnswers checks an Android application id", () => {
+  const base = { name: "A", visibility: "public" };
+  for (const bad of ["app", "Org.example.app", "org.example.", "org.1example.app", "org.example.new", "org.fun.app", "org-example.app"]) {
+    assert.throws(() => saveAnswers(tmp(), { ...base, application_id: bad }, ["android-toolchain"], realModulesDir), {
+      message: "application_id must be a lower-case reverse domain such as org.example.app, with no Java or Kotlin keyword as a segment",
+    }, bad);
+  }
+  assert.deepEqual(saveAnswers(tmp(), { ...base, application_id: "org.example.my_app2" }, ["android-toolchain"], realModulesDir), { slug: "a" });
+});
+
 const script = fileURLToPath(new URL("../skills/bootstrap/scripts/state.mjs", import.meta.url));
 const cli = (...args) => spawnSync("node", [script, ...args], { encoding: "utf8" });
 
