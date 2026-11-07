@@ -39,7 +39,8 @@ test("the coding standards gain the JavaScript section", () => {
 });
 
 test("Node is pinned to an exact release in .nvmrc, which CI reads", () => {
-  assert.match(read(".nvmrc"), /^\d+\.\d+\.\d+\n$/);
+  const [, major] = read(".nvmrc").match(/^(\d+)\.\d+\.\d+\n$/);
+  assert.equal(Number(major) % 2, 0, "an LTS line has an even major");
   const action = read(".github/actions/setup-node-pnpm/action.yml");
   assert.match(action, /node-version-file: \.nvmrc/);
   assert.doesNotMatch(action, /node-version:/);
