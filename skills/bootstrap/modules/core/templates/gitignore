@@ -19,3 +19,9 @@ test-results/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+.gradle/
+.kotlin/
+build/
+local.properties
+*.jks
+*.keystore

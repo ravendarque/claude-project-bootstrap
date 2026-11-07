@@ -31,6 +31,17 @@ function signingWorks() {
   }
 }
 
+function javaMajor() {
+  const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, "bin", "java") : "java";
+  const version = (run(java, ["-XshowSettings:properties", "-version"]).stderr ?? "").match(/^\s*java\.specification\.version = (\d+)/m);
+  return version ? Number(version[1]) : 0;
+}
+
+function androidSdk() {
+  const home = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+  return Boolean(home) && existsSync(join(home, "licenses", "android-sdk-license"));
+}
+
 const TOOLS = {
   core: [
     { tool: "git", check: () => ok(run("git", ["--version"])), fix: "Install git" },
@@ -69,6 +80,18 @@ const TOOLS = {
       fix: "Install gpg (the scaffold uses it to verify mise's signed checksum list)",
     },
     { tool: "curl", check: () => ok(run("curl", ["--version"])), fix: "Install curl" },
+  ],
+  "android-toolchain": [
+    {
+      tool: "JDK >= 21",
+      check: () => javaMajor() >= 21,
+      fix: "Install a JDK 21 (Eclipse Temurin, https://adoptium.net/) and set JAVA_HOME to it; Gradle builds with a JDK 21 toolchain",
+    },
+    {
+      tool: "Android SDK with accepted licences",
+      check: androidSdk,
+      fix: "Install the Android SDK command-line tools (https://developer.android.com/tools), set ANDROID_HOME to the SDK, then run `sdkmanager --licenses`; Gradle installs the platform and build tools it needs",
+    },
   ],
   "cloudflare-opentofu": [
     { tool: "tofu", check: () => ok(run("tofu", ["version"])), fix: "Install OpenTofu (https://opentofu.org/docs/intro/install/)" },

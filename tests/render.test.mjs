@@ -224,6 +224,19 @@ test("validateAnswers derives private, licensor and escaped name keys", () => {
   assert.equal(answers.name_html, "Sam&#39;s &quot;App&quot; &lt;1&gt;");
 });
 
+test("validateAnswers derives Kotlin and Android string forms of the name", () => {
+  const { answers } = validateAnswers({ name: `@Sam's "App" $x <1> & \\f` });
+  assert.equal(answers.name_kotlin, String.raw`"@Sam's \"App\" \$x <1> & \\f"`);
+  assert.equal(answers.greeting_kotlin, String.raw`"Hello from @Sam's \"App\" \$x <1> & \\f"`);
+  assert.equal(answers.name_android, String.raw`\@Sam\'s \"App\" $x &lt;1&gt; &amp; \\f`);
+  assert.equal(validateAnswers({ name: "A\fB" }).answers.name_kotlin, String.raw`"A\u000CB"`);
+});
+
+test("validateAnswers derives the application id path only when there's an id", () => {
+  assert.equal(validateAnswers({ name: "A", application_id: "org.example.app" }).answers.application_id_path, "org/example/app");
+  assert.equal(validateAnswers({ name: "A" }).answers.application_id_path, undefined);
+});
+
 test("validateAnswers keeps a supplied licensor", () => {
   assert.equal(validateAnswers({ name: "Demo", licensor: "Someone Else" }).answers.licensor, "Someone Else");
 });

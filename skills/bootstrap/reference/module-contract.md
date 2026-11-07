@@ -11,7 +11,7 @@ and `templates/`.
 | `dependsOn` | Modules that must also be selected; the renderer pulls them in first |
 | `conflictsWith` | Modules that cannot be selected together with this one, whether chosen directly or pulled in through `dependsOn`; resolution fails naming both |
 | `maxSlugLength` | The longest slug the module's derived names allow (default 63) |
-| `questions` | Interview questions: `{ key, type, prompt }`, where `type` is `boolean`, `string` or `hostname`; answers are checked against it |
+| `questions` | Interview questions: `{ key, type, prompt }`, where `type` is `boolean`, `string`, `hostname` or `application_id` (a lower-case reverse domain with no Java or Kotlin keyword as a segment); answers are checked against it |
 | `files` | `{ from, to, when?, stage? }`; `when` is an answer key (truthy) or `!key` (falsy); `stage` is `initial` (default, pushed with the initial commit) or `app` (shipped in the first PR); `merge: true` deep-merges a JSON file into the one an earlier module writes |
 | `overrides` | Destination paths of other modules' files that this module replaces wholesale; prefer `merge` |
 | `allowBuilds` | pnpm install-script decisions: `{ "<package>": { "allow": true or false, "reason": "…" } }`, rendered into `pnpm-workspace.yaml` |
@@ -31,8 +31,15 @@ Derived keys: `slug`, `required_checks_json`, `claude_index`,
 `licensor` (defaulted), and escaped forms of the name for code and markup:
 `name_js`, `greeting_js`, `name_html`, `description_toml`; and
 `python_package`, the slug as a Python identifier (`-` becomes `_`, and a
-trailing `_` is added when that is a Python keyword). Never put `{{name}}`
-inside a JS or Python string or HTML, or `{{description}}` inside a TOML string.
+trailing `_` is added when that is a Python keyword); `name_kotlin` and
+`greeting_kotlin`, Kotlin string literals; `name_android`, the name escaped
+for an Android string resource; and, when there's an `application_id`
+answer, `application_id_path`, the id as a directory path. Never put
+`{{name}}` inside a JS, Python or Kotlin string, HTML or an Android
+resource, or `{{description}}` inside a TOML string.
+
+Binary templates (images, archives, `.jar`) are copied as they are, and a
+template that is executable in the plugin is rendered executable.
 
 A module with a release artefact renders its own workflow that runs on
 `release: published`, builds the artefact with the module's toolchain, and
