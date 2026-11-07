@@ -36,7 +36,9 @@ directory:
    curl -fsSL https://nodejs.org/dist/index.json | jq -r '[.[] | select(.lts != false and ((.date + "T23:59:59Z") | fromdateiso8601) < (now - 259200))] | max_by(.version | ltrimstr("v") | split(".") | map(tonumber)) | .version | ltrimstr("v")'
    ```
 
-   Replace `@@NODE_VERSION@@` in `.nvmrc` with it.
+   Continue only if it printed a version (`X.Y.Z`); anything else, including
+   `null` or nothing, means the fetch failed, so stop and report it. Replace
+   `@@NODE_VERSION@@` in `.nvmrc` with it.
 2. **Use that Node.** Make it the active Node (`nvm use`, `fnm use`, or
    prefix each command with `mise exec node@<version> --`) and check that
    `node --version` prints `v<version>`. If no version manager can provide
