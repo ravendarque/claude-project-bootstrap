@@ -123,9 +123,18 @@ test("the board sync ignores Dependabot", () => {
   assert.match(read(renders.core, ".github/workflows/project-status-sync.yml"), /github\.actor != 'dependabot\[bot\]'/);
 });
 
-test("in-repo actions use the self-repository syntax", () => {
+const SELF_REPOSITORY = /^\$\/[^@\s]+$/;
+const PINNED = /^[\w.-]+\/[\w.-]+(\/[\w./-]+)?@[0-9a-f]{40} # v\d/;
+
+test("every uses: is a self-repository path or pinned to a full commit SHA with a version comment", () => {
   for (const [name, dir] of Object.entries(renders)) {
-    for (const wf of workflows(dir)) assert.doesNotMatch(read(dir, wf), /uses: \.\//, `${name} ${wf}`);
+    const actionFiles = [...files(dir)].filter(f => f.startsWith(".github/workflows/") || /^\.github\/actions\/.+\/action\.ya?ml$/.test(f));
+    assert.ok(actionFiles.length > 0, name);
+    for (const file of actionFiles) {
+      for (const [, ref] of read(dir, file).matchAll(/^\s*(?:-\s+)?uses:\s*(.+?)\s*$/gm)) {
+        assert.ok(SELF_REPOSITORY.test(ref) || PINNED.test(ref), `${name} ${file}: ${ref}`);
+      }
+    }
   }
 });
 
