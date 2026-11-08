@@ -173,15 +173,18 @@ Verified on 2026-11-08:
 - **Idempotence:**
   - Without `--rotate`, a step whose GitHub secrets already exist reports
     that and does nothing.
-  - With `--rotate`, it makes a new credential, updates the existing Pass
-    item and overwrites the secrets. Rotation is the same code path, so
-    the yearly token expiry is one command.
+  - With `--rotate`, it makes a new credential, creates a new Pass item,
+    and overwrites the secrets. Only then does it move the old item to the
+    bin (`pass-cli item trash`), where it can still be recovered.
+    Rotation is the same code path, so the yearly token expiry is one
+    command.
 - **Writing secrets:**
   - GitHub: `gh secret set` and `gh variable set` read the value from
     stdin (`--env` where the module says so, or at repository level where
     state records the environment as skipped).
-  - Pass: `pass-cli item create custom --from-template -` (or `item
-    update` on rotation), with JSON on stdin and secrets in hidden fields.
+  - Pass: `pass-cli item create custom --from-template -`, with JSON on
+    stdin and secrets in hidden fields. Never use `pass-cli item update`:
+    it only takes values as `--field name=value` arguments.
   - No secret is ever an argument or an inherited environment variable.
 - **Pass items:**
   - Each project gets a folder named `<slug>` in the vault. The script
@@ -357,8 +360,10 @@ to the Pass item in the app.
 
 ### Rotation
 
-A new credential is created and verified, then written to Pass, then set
-in GitHub. Old credentials are handled per step:
+A new credential is created and verified, then written to a new Pass
+item, then set in GitHub. Only after that is the old item moved to the
+bin. Duplicate checks count active items only. Old credentials are handled
+per step:
 
 - **Cloudflare:** the old token ids are recorded in the Pass item. The old
   tokens are revoked only after the new secrets are set.
