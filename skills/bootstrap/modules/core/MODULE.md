@@ -121,7 +121,13 @@ variable and secret.
 **Why:** the workflow token can't reach Projects v2, and a GitHub App can't
 reach a board owned by a personal account.
 
-**Do:**
+**Do:** run
+`node <skill dir>/scripts/secrets.mjs board-token <project dir>`. In the
+page it opens, set the expiration to 1 year and generate the token, then
+paste it at the script's hidden prompt. The script stores it in Proton Pass
+and sets the secret.
+
+**By hand:**
 1. GitHub → Settings → Developer settings → Personal access tokens →
    Tokens (classic) → Generate new token.
 2. Note: `<slug> board sync`. Expiration: 1 year. Scope: `project` only.
