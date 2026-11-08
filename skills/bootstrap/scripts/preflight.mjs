@@ -83,9 +83,9 @@ const TOOLS = {
   ],
   "android-toolchain": [
     {
-      tool: "JDK >= 21",
-      check: () => javaMajor() >= 21,
-      fix: "Install a JDK 21 (Eclipse Temurin, https://adoptium.net/) and set JAVA_HOME to it; Gradle builds with a JDK 21 toolchain",
+      tool: "JDK 21",
+      check: () => javaMajor() === 21,
+      fix: "Install a JDK 21 (Eclipse Temurin, https://adoptium.net/) and set JAVA_HOME to it; the build uses a JDK 21 toolchain and doesn't download one",
     },
     {
       tool: "Android SDK with accepted licences",

@@ -40,9 +40,9 @@ jobs:
             [ -n "${!name}" ] || { echo "::error::Secret $name is not set"; exit 1; }
           done
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
+          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
           base64 --decode <<< "$ANDROID_KEYSTORE_BASE64" > "$ANDROID_KEYSTORE_PATH"
           ./gradlew :app:assembleRelease -PappVersion="${TAG#v}"
-          rm -f "$ANDROID_KEYSTORE_PATH"
       - name: Verify the signature and attach the APK
         env:
           GH_TOKEN: ${{ github.token }}
