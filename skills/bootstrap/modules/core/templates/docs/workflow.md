@@ -37,6 +37,7 @@ Name a branch by what the change does for users, with the issue number:
 - The PR body says what changed, the judgement calls made and why, and how
   it was verified. It is not a restatement of the diff.
 - Merges are squash only. The branch is deleted on merge.
+{{merge_rule}}
 
 ## Git
 

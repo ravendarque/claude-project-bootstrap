@@ -34,7 +34,9 @@ Derived keys: `slug`, `required_checks_json`, `claude_index`,
 trailing `_` is added when that is a Python keyword); `name_kotlin` and
 `greeting_kotlin`, Kotlin string literals; `name_android`, the name escaped
 for an Android string resource; and, when there's an `application_id`
-answer, `application_id_path`, the id as a directory path. Never put
+answer, `application_id_path`, the id as a directory path. Core also
+derives `merge_rule` and `merge_index` from the `merge_policy` answer: the
+merge rule for `docs/workflow.md` and its CLAUDE.md index line. Never put
 `{{name}}` inside a JS, Python or Kotlin string, HTML or an Android
 resource, or `{{description}}` inside a TOML string.
 

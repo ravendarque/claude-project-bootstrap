@@ -11,6 +11,7 @@ Read a doc when the work touches it, not up front.
 - Branches are named by what the change does for users: `feature/`, `fix/`, `ci/`, `chore/`, `spike/`, `docs/`: [workflow](docs/workflow.md#branches).
 - Open every PR as a draft with its `release:` label set at creation, then mark it ready: [versioning](docs/versioning.md).
 - Work through the definition of done before marking a PR ready: [definition of done](docs/definition-of-done.md).
+{{merge_index}}
 - Never force-push without asking first, every time. Update a pushed branch by merging `main`, not rebasing: [workflow](docs/workflow.md#git).
 - Pace GitHub API mutations and never retry into a rate limit: [workflow](docs/workflow.md#github-api).
 - Propose before building when there's an open design question; concrete fixes with clear direction go straight ahead: [workflow](docs/workflow.md#ways-of-working).
