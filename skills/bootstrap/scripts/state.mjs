@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { maxSlugLength, resolveModules, validateAnswers } from "./render.mjs";
+import { maxSlugLength, mergePolicies, resolveModules, validateAnswers } from "./render.mjs";
 
 const EMPTY = { steps: {}, answers: null, modules: [], ids: {}, skipped: {} };
 const folder = dir => join(dir, ".bootstrap");
@@ -60,6 +60,10 @@ function checkQuestions(input, manifests) {
     } else if (type === "application_id" && !isApplicationId(value)) {
       throw new Error(`${key} must be a lower-case reverse domain such as org.example.app, with no Java or Kotlin keyword as a segment`);
     }
+  }
+  const policies = mergePolicies(manifests);
+  if (!Object.hasOwn(policies, input.merge_policy ?? "")) {
+    throw new Error(`merge_policy must be one of ${Object.keys(policies).join(", ")}`);
   }
 }
 

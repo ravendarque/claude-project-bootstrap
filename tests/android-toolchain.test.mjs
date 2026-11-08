@@ -32,7 +32,7 @@ test("the initial stage ships the build, and the app stage the manifest, code an
   ]) {
     assert.ok(all.includes(path), path);
   }
-  const { answers: full } = validateAnswers({ name: "Sample Project", description: "x", owner: "o", visibility: "public", ...answers });
+  const { answers: full } = validateAnswers({ name: "Sample Project", description: "x", owner: "o", visibility: "public", merge_policy: "claude", ...answers });
   const modules = resolveModules(["android-toolchain"], realModulesDir);
   const initial = render({ modules, answers: full, modulesDir: realModulesDir, destDir: mkdtempSync(join(tmpdir(), "android-")), stage: "initial" });
   assert.ok(initial.includes("app/build.gradle.kts"));

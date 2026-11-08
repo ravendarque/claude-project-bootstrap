@@ -24,7 +24,7 @@ test("the initial stage ships the tooling and the package, and the app stage the
   }
   const initial = mkdtempSync(join(tmpdir(), "py-initial-"));
   const modules = resolveModules(["python-toolchain"], realModulesDir);
-  const { answers } = validateAnswers({ name: "Sample Project", description: "x", owner: "o", visibility: "public" });
+  const { answers } = validateAnswers({ name: "Sample Project", description: "x", owner: "o", visibility: "public", merge_policy: "claude" });
   const written = render({ modules, answers, modulesDir: realModulesDir, destDir: initial, stage: "initial" });
   assert.ok(written.includes("src/sample_project/__init__.py"));
   assert.ok(!written.includes("src/sample_project/cli.py"));
@@ -41,7 +41,7 @@ test("pyproject derives the package, entry point and escaped description from th
 });
 
 test("a slug that is a Python keyword still gives an importable package", () => {
-  const { answers } = validateAnswers({ name: "Import", description: "x", owner: "o", visibility: "public" });
+  const { answers } = validateAnswers({ name: "Import", description: "x", owner: "o", visibility: "public", merge_policy: "claude" });
   assert.equal(answers.python_package, "import_");
   assert.equal(validateAnswers({ name: "my-app", description: "x" }).answers.python_package, "my_app");
 });

@@ -54,7 +54,7 @@ test("recordId stores a created resource id and getId reads it back", () => {
 
 test("saveAnswers validates, saves the run and writes answers.json", () => {
   const dir = tmp();
-  const { slug } = saveAnswers(dir, { name: "My App", owner: "o", visibility: "public" }, ["js-toolchain"], realModulesDir);
+  const { slug } = saveAnswers(dir, { name: "My App", owner: "o", visibility: "public", merge_policy: "claude" }, ["js-toolchain"], realModulesDir);
   assert.equal(slug, "my-app");
   const state = loadState(dir);
   assert.deepEqual(state.modules, ["js-toolchain"]);
@@ -64,7 +64,7 @@ test("saveAnswers validates, saves the run and writes answers.json", () => {
 
 test("saveAnswers applies the selected modules' slug limit", () => {
   assert.throws(
-    () => saveAnswers(tmp(), { name: "x".repeat(45), visibility: "public", beta: false, zone_name: "example.com" }, ["cloudflare-opentofu"], realModulesDir),
+    () => saveAnswers(tmp(), { name: "x".repeat(45), visibility: "public", beta: false, zone_name: "example.com", merge_policy: "claude" }, ["cloudflare-opentofu"], realModulesDir),
     /allow at most 40/,
   );
 });
@@ -91,10 +91,26 @@ test("saveAnswers requires a known github_plan for a private repository only", (
   }
   for (const github_plan of ["free", "pro", "team", "enterprise"]) {
     const dir = tmp();
-    saveAnswers(dir, { name: "A", visibility: "private", github_plan }, [], realModulesDir);
+    saveAnswers(dir, { name: "A", visibility: "private", github_plan, merge_policy: "claude" }, [], realModulesDir);
     assert.equal(loadState(dir).answers.github_plan, github_plan);
   }
-  saveAnswers(tmp(), { name: "A", visibility: "public" }, [], realModulesDir);
+  saveAnswers(tmp(), { name: "A", visibility: "public", merge_policy: "claude" }, [], realModulesDir);
+});
+
+test("saveAnswers requires a known merge_policy, checked after the module questions", () => {
+  for (const merge_policy of [undefined, "", "Claude", "auto"]) {
+    assert.throws(() => saveAnswers(tmp(), { name: "A", visibility: "public", merge_policy }, [], realModulesDir), {
+      message: "merge_policy must be one of claude, claude-except-release, maintainer",
+    });
+  }
+  assert.throws(() => saveAnswers(tmp(), { name: "A", visibility: "public" }, ["android-toolchain"], realModulesDir), {
+    message: "application_id is required",
+  });
+  for (const merge_policy of ["claude", "claude-except-release", "maintainer"]) {
+    const dir = tmp();
+    saveAnswers(dir, { name: "A", visibility: "public", merge_policy }, [], realModulesDir);
+    assert.equal(loadState(dir).answers.merge_policy, merge_policy);
+  }
 });
 
 test("saveAnswers checks each selected module's questions by type", () => {
@@ -121,7 +137,7 @@ test("saveAnswers checks an Android application id", () => {
       message: "application_id must be a lower-case reverse domain such as org.example.app, with no Java or Kotlin keyword as a segment",
     }, bad);
   }
-  assert.deepEqual(saveAnswers(tmp(), { ...base, application_id: "org.example.my_app2" }, ["android-toolchain"], realModulesDir), { slug: "a" });
+  assert.deepEqual(saveAnswers(tmp(), { ...base, merge_policy: "claude", application_id: "org.example.my_app2" }, ["android-toolchain"], realModulesDir), { slug: "a" });
 });
 
 const script = fileURLToPath(new URL("../skills/bootstrap/scripts/state.mjs", import.meta.url));

@@ -164,6 +164,16 @@ function deepMerge(base, extra) {
   return merged;
 }
 
+export function mergePolicies(modules) {
+  return modules.find(m => m.mergePolicies)?.mergePolicies ?? {};
+}
+
+function mergePolicyKeys(modules, policy) {
+  const policies = mergePolicies(modules);
+  if (!Object.hasOwn(policies, policy ?? "")) return {};
+  return { merge_rule: policies[policy].rule.join("\n"), merge_index: policies[policy].index };
+}
+
 function deriveKeys(modules, answers, modulesDir) {
   const checks = [
     ...new Set(
@@ -187,6 +197,7 @@ function deriveKeys(modules, answers, modulesDir) {
       noneAllowed: [...new Set(modules.flatMap(m => m.releasePaths?.noneAllowed ?? []))],
       noneForbidden: [...new Set(modules.flatMap(m => m.releasePaths?.noneForbidden ?? []))],
     }),
+    ...mergePolicyKeys(modules, answers.merge_policy),
     ...(answers.owner && { repo_url: `https://github.com/${answers.owner}/${answers.slug}` }),
   };
 }

@@ -63,7 +63,9 @@ before marking a step done or telling the user it worked.
 `.bootstrap/state.json` exists. Then read state (`state.mjs show <dir>`),
 load the selected modules' MODULE.md files and continue from
 `state.mjs next <dir> <ids>`, with the step ids below in order. Skipped
-steps count as settled. Before re-running a create:
+steps count as settled. If the saved answers lack one the interview now asks
+(such as `merge_policy`, added after a run began), ask it and run
+`save-answers` again before rendering anything. Before re-running a create:
 
 - if the resource has a recorded id (`state.mjs get`), it exists: don't
   re-create it, and mark the step done;
@@ -100,6 +102,19 @@ steps count as settled. Before re-running a create:
      `js-toolchain`) and `cloudflare-opentofu` (needs `web-app`), which
      rule out the other two stacks;
    - each selected module's questions from its MODULE.md.
+   - after the module questions, `merge_policy`: who merges a PR, and when.
+     Explain that a merge to `main` that carries a release label cuts a
+     release, so the right rule depends on what a release reaches. Offer:
+     `claude` (Claude merges once the definition of done is met and every
+     required check passes, release PRs included, as standing approval),
+     `claude-except-release` (the same, but Claude asks before merging a PR
+     that cuts a release) or `maintainer` (Claude marks PRs ready and the
+     maintainer merges). Recommend from the answers so far:
+     `cloudflare-opentofu` with `beta: true` → `claude` (a release goes to
+     beta, and a person promotes it); `cloudflare-opentofu` with
+     `beta: false` → `claude-except-release` (a release deploys straight to
+     production); otherwise `claude`, unless the user says the project's
+     releases reach anyone but the maintainer, then `claude-except-release`.
 
    Write the answers to a temporary JSON file and run
    `node scripts/state.mjs save-answers <dir> <file> <modules>`. It

@@ -12,6 +12,7 @@ and `templates/`.
 | `conflictsWith` | Modules that cannot be selected together with this one, whether chosen directly or pulled in through `dependsOn`; resolution fails naming both |
 | `maxSlugLength` | The longest slug the module's derived names allow (default 63) |
 | `questions` | Interview questions: `{ key, type, prompt }`, where `type` is `boolean`, `string`, `hostname` or `application_id` (a lower-case reverse domain with no Java or Kotlin keyword as a segment); answers are checked against it |
+| `mergePolicies` | Core only: `{ "<policy>": { rule, index } }`, the allowed `merge_policy` answers, each with its `docs/workflow.md` rule (an array of lines) and CLAUDE.md index line |
 | `files` | `{ from, to, when?, stage? }`; `when` is an answer key (truthy) or `!key` (falsy); `stage` is `initial` (default, pushed with the initial commit) or `app` (shipped in the first PR); `merge: true` deep-merges a JSON file into the one an earlier module writes |
 | `overrides` | Destination paths of other modules' files that this module replaces wholesale; prefer `merge` |
 | `allowBuilds` | pnpm install-script decisions: `{ "<package>": { "allow": true or false, "reason": "…" } }`, rendered into `pnpm-workspace.yaml` |
@@ -34,7 +35,10 @@ Derived keys: `slug`, `required_checks_json`, `claude_index`,
 trailing `_` is added when that is a Python keyword); `name_kotlin` and
 `greeting_kotlin`, Kotlin string literals; `name_android`, the name escaped
 for an Android string resource; and, when there's an `application_id`
-answer, `application_id_path`, the id as a directory path. Never put
+answer, `application_id_path`, the id as a directory path. Core also
+derives `merge_rule` and `merge_index` from the `merge_policy` answer and
+its manifest's `mergePolicies` (each policy's rule for `docs/workflow.md`
+and its CLAUDE.md index line). Never put
 `{{name}}` inside a JS, Python or Kotlin string, HTML or an Android
 resource, or `{{description}}` inside a TOML string.
 
