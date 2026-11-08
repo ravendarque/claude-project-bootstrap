@@ -72,5 +72,5 @@ test("browsers aren't preflight tools: WebdriverIO downloads them", () => {
 });
 
 test("the android module checks for a JDK 21 and the Android SDK", () => {
-  assert.deepEqual(toolsFor(["android-toolchain"], realModulesDir).slice(-2), ["JDK >= 21", "Android SDK with accepted licences"]);
+  assert.deepEqual(toolsFor(["android-toolchain"], realModulesDir).slice(-2), ["JDK 21", "Android SDK with accepted licences"]);
 });

@@ -13,6 +13,11 @@ val (appMajor, appMinor, appPatch) = appVersionParts
 
 val releaseKeystore = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
 
+fun signingEnv(name: String): String =
+    requireNotNull(providers.environmentVariable(name).orNull) {
+        "$name must be set when ANDROID_KEYSTORE_PATH is"
+    }
+
 android {
     namespace = "{{application_id}}"
     compileSdk = 37
@@ -29,9 +34,9 @@ android {
         if (releaseKeystore.isPresent) {
             create("release") {
                 storeFile = file(releaseKeystore.get())
-                storePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").get()
-                keyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").get()
-                keyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").get()
+                storePassword = signingEnv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = signingEnv("ANDROID_KEY_ALIAS")
+                keyPassword = signingEnv("ANDROID_KEY_PASSWORD")
             }
         }
     }
@@ -73,10 +78,8 @@ android {
     }
 
     lint {
-        abortOnError = true
         warningsAsErrors = true
         checkDependencies = true
-        checkReleaseBuilds = true
         error +=
             setOf(
                 "ClickableViewAccessibility",
