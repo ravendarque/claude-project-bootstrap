@@ -24,6 +24,7 @@ Name a branch by what the change does for users, with the issue number:
 | `feature/` | New behaviour or content, including user-facing copy and help |
 | `fix/` | Corrections to existing behaviour or content |
 | `ci/` | Workflows and automation |
+| `chore/` | Tooling, dependencies and repository configuration that never reach users; workflows and automation are `ci/` |
 | `spike/` | Investigations; not merged as-is |
 | `docs/` | Repo docs that never reach users |
 

@@ -8,7 +8,7 @@ Read a doc when the work touches it, not up front.
 ## Process
 
 - Every change starts as a GitHub issue, then a branch, then a PR. Never commit to `main`: [workflow](docs/workflow.md).
-- Branches are named by what the change does for users: `feature/`, `fix/`, `ci/`, `spike/`, `docs/`: [workflow](docs/workflow.md#branches).
+- Branches are named by what the change does for users: `feature/`, `fix/`, `ci/`, `chore/`, `spike/`, `docs/`: [workflow](docs/workflow.md#branches).
 - Open every PR as a draft with its `release:` label set at creation, then mark it ready: [versioning](docs/versioning.md).
 - Work through the definition of done before marking a PR ready: [definition of done](docs/definition-of-done.md).
 - Never force-push without asking first, every time. Update a pushed branch by merging `main`, not rebasing: [workflow](docs/workflow.md#git).

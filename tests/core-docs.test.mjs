@@ -13,6 +13,13 @@ test("CLAUDE.md is a short index", () => {
   assert.ok(read("CLAUDE.md").split("\n").length <= 60);
 });
 
+test("the workflow table and the CLAUDE.md index list the same branch prefixes", () => {
+  const table = [...read("docs/workflow.md").matchAll(/^\| `([a-z]+\/)` \|/gm)].map(m => m[1]);
+  const index = [...read("CLAUDE.md").match(/^- Branches are named.*$/m)[0].matchAll(/`([a-z]+\/)`/g)].map(m => m[1]);
+  assert.ok(table.includes("chore/"));
+  assert.deepEqual(index, table);
+});
+
 test("every relative Markdown link resolves", () => {
   assert.deepEqual(brokenLinks(dest), []);
 });
