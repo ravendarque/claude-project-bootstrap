@@ -100,6 +100,8 @@ After core's configuration. Step `github:android-toolchain:1`.
    **Fallback, only if the create or a verification fails** (typically a free
    private repository): record the step skipped with
    `node scripts/state.mjs skip <dir> github:android-toolchain:1 "environment branch policy not available: <what failed>"`,
+   record it for the secrets script with
+   `node scripts/state.mjs record <dir> skipped_envs release`,
    remove the `environment: release` line from `release-artefacts.yml` on the
    first PR's branch, set the secrets at repository level (the manual step
    says how), and add a row to `docs/threat-model.md`'s STRIDE table: threat
