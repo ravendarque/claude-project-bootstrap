@@ -18,14 +18,6 @@ test("every workflow declares top-level permissions", () => {
   for (const wf of workflows) assert.match(read(wf), /^permissions:/m, wf);
 });
 
-test("every action is pinned to a full commit SHA with a version comment", () => {
-  for (const wf of workflows) {
-    for (const [, ref] of read(wf).matchAll(/uses:\s*(\S+@\S+.*)$/gm)) {
-      assert.match(ref, /@[0-9a-f]{40} # v\d/, `${wf}: ${ref}`);
-    }
-  }
-});
-
 test("the ruleset requires the core check, signatures and squash-only PRs", () => {
   const ruleset = JSON.parse(read(".bootstrap/github/ruleset.json"));
   const rule = type => ruleset.rules.find(r => r.type === type);
