@@ -41,19 +41,26 @@ the security features a private repo can't use).
 4. Ruleset (when the recorded `github_plan` is `free` on a private repo,
    skip it as the plan said and record it with `state.mjs skip`):
    `gh api -X POST repos/$R/rulesets --input .bootstrap/github/ruleset.json`.
-5. Board. Look for an existing project titled `<name>` first
-   (`gh project list --owner <owner> --format json`); create it only if
-   there's none:
-   - `gh project create --owner <owner> --title "<name>" --format json`;
-     record `project_number` and `project_id`;
-   - `gh project link <number> --owner <owner> --repo $R`;
-   - read the Status field (`gh project field-list <number> --owner <owner> --format json`)
-     and record `status_field_id`;
-   - set its options to Backlog, Ready, In Progress, In Review, Done with the
-     `updateProjectV2Field` GraphQL mutation (only if they differ: the
-     mutation regenerates option ids);
-   - re-read the field list and record `in_progress_option` and
-     `in_review_option`.
+5. Board, copied from the private `Project template` project:
+   1. Look for an existing project titled `<name>`
+      (`gh project list --owner <owner> --format json`). If one exists,
+      don't copy: record its `project_number` and `project_id`.
+   2. Otherwise look up the template by its exact title in the same list.
+      Several projects with that title is an error: stop and say so.
+   3. Copy it with the `copyProjectV2` GraphQL mutation
+      (`includeDraftIssues: false`, the template's id as `projectId`, the
+      owner's id as `ownerId`, `title: "<name>"`), then make the copy
+      private with `updateProjectV2` (`public: false`). Record
+      `project_number` and `project_id`.
+   4. `gh project link <number> --owner <owner> --repo $R`.
+   5. Read the Status field
+      (`gh project field-list <number> --owner <owner> --format json`).
+      Record `status_field_id`, and find the option ids for `In progress`
+      and `In review` by option name: record them as `in_progress_option`
+      and `in_review_option`.
+   6. Fail loudly if the Status options aren't exactly Backlog, Ready,
+      In progress, In review and Done. Never rewrite them: the mutation
+      regenerates option ids.
 6. Repository variables for the board sync workflow, from the recorded ids:
    `gh variable set PROJECT_ID`, `PROJECT_STATUS_FIELD_ID`,
    `PROJECT_IN_PROGRESS_OPTION` and `PROJECT_IN_REVIEW_OPTION`, each with
@@ -106,20 +113,20 @@ reach a board owned by a personal account.
 **Verify (Claude runs):** `gh secret list --repo $R`
 **Expected:** `PROJECT_STATUS_PAT` listed.
 
-### core:3 Turn on the board's built-in workflows
+### core:3 Turn on the board's Auto-add workflow
 
-**Why:** Done and archiving are handled by GitHub's own project workflows,
-which the API can read but not create or configure.
+**Why:** the board is copied from the template with every workflow except
+Auto-add, which is set per repository. The API can read workflows but not
+create or configure them.
 
-**Do:** open the project → ⋯ → Workflows, and enable:
-1. **Item added to project**: set Status to Backlog.
-2. **Item closed**: set Status to Done.
-3. **Pull request merged**: set Status to Done.
-4. **Auto-add to project**: this repository, filter `is:issue`.
-5. **Auto-archive items**: filter `is:closed updated:<@today-2w`, so closed
-   items leave the board two weeks after they close.
+**Do:** open the project → ⋯ → Workflows → **Auto-add to project**, set it
+to this repository with the filter `is:issue`, and enable it.
 
 **Verify (Claude runs):**
 `gh api graphql -f query='query($n:Int!){ user(login:"<owner>"){ projectV2(number:$n){ workflows(first:20){ nodes{ name enabled } } } } }' -F n=<project_number> --jq '.data.user.projectV2.workflows.nodes[] | select(.enabled) | .name'`
-**Expected:** the five names above are listed. The API doesn't expose each
-workflow's settings, so check the Status values and filters with the user.
+**Expected:** exactly these eight names are listed: Auto-add sub-issues to
+project, Auto-add to project, Auto-archive items, Auto-close issue, Item
+added to project, Item closed, Pull request linked to issue, Pull request
+merged. The API doesn't expose each workflow's settings, so ask the user to
+confirm by eye that Auto-add's filter is `is:issue` for this repository and
+that Auto-archive items' filter is `is:closed updated:<@today-2w`.

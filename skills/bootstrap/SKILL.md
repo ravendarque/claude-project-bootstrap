@@ -142,6 +142,12 @@ steps count as settled. If the saved answers lack one the interview now asks
    - every screening row marked listed (`Y`) in the modules' manifests, with
      its note, so the user decides with the facts;
    - each module's plan warnings from its MODULE.md;
+   - if the owner's account has no `Project template` project
+     (`gh project list --owner <owner> --format json`), a plan warning: new
+     boards are copied from it. The user chooses between stopping to create
+     one (see `docs/runbooks/board-template.md` in this plugin's repository)
+     and today's path: an empty board with the Status options set, and
+     every workflow and view done by hand;
    - the "as at" date in `modules/core/templates/LICENSE-SCHEDULE.md`; warn
      if it's more than six months old;
    - that the initial commit is pushed straight to `main` once, before
@@ -190,7 +196,7 @@ steps count as settled. If the saved answers lack one the interview now asks
       have added it), take the item id from the `item-list` entry whose
       content URL matches the issue. Record it
       (`state.mjs record <dir> first_issue_item <id>`) so a resume can reuse
-      it, then set it to In Progress with the recorded ids
+      it, then set it to In progress with the recorded ids
       (`gh project item-edit --id <item-id> --project-id <project_id> --field-id <status_field_id> --single-select-option-id <in_progress_option>`).
       Only then create the branch
       `feature/<n>-initial-app`, render with
