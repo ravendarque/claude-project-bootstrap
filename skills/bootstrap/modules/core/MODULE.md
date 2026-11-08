@@ -89,7 +89,13 @@ labels; `gh variable list --repo $R` shows the four project variables.
 **Why:** a tag pushed with the default workflow token doesn't trigger other
 workflows, so releases (and deploys) would never fire.
 
-**Do:**
+**Do:** run
+`node <skill dir>/scripts/secrets.mjs release-app <project dir>`. In the
+browser it opens, click "Create GitHub App", then install the App on this
+repository only. The script stores the key in Proton Pass and sets the
+variable and secret.
+
+**By hand:**
 1. GitHub → Settings → Developer settings → GitHub Apps → New GitHub App.
 2. Name: `<slug>-release`. Homepage URL: the repository URL. Untick
    Webhook → Active.

@@ -23,6 +23,22 @@ export function stubDeps(respond = () => ({ status: 0, stdout: "", stderr: "" })
   };
 }
 
+export function vaultResponder({ slug = "sample-project", items = [] } = {}) {
+  const live = [...items];
+  let created = false;
+  return (cmd, args, options) => {
+    if (cmd !== "pass-cli") return {};
+    const key = args.slice(0, 2).join(" ");
+    if (key === "folder list") {
+      return { stdout: JSON.stringify(created ? [{ id: "f1", parent_folder_id: null, content: { name: slug } }] : []) };
+    }
+    if (key === "folder create") created = true;
+    if (key === "item list") return { stdout: JSON.stringify({ items: live, folders: [] }) };
+    if (key === "item create") live.push({ id: `new${live.length}`, title: JSON.parse(options.input).title, folder_id: "f1" });
+    return {};
+  };
+}
+
 export function projectDir({ owner = "sample-owner", name = "Sample Project", slug = "sample-project", zone_name, skippedEnvs } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "secrets-"));
   saveRun(dir, { answers: { owner, name, slug, ...(zone_name && { zone_name }) }, modules: ["core"] });
