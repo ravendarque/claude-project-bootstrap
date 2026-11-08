@@ -118,6 +118,8 @@ After core's configuration. Steps `github:cloudflare-opentofu:<n>`.
    environments aren't available), and for no other reason:
    - record each environment that failed as skipped:
      `node scripts/state.mjs skip <dir> github:cloudflare-opentofu:1 "environment branch policy not available: <what failed>"`;
+   - record the skipped environments for the secrets script:
+     `node scripts/state.mjs record <dir> skipped_envs <comma list of skipped environments>`;
    - set the secrets of a skipped environment at repository level (the
      manual steps say how);
    - add a row to `docs/threat-model.md`'s STRIDE table, after the existing
