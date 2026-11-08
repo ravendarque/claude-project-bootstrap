@@ -44,9 +44,11 @@ the security features a private repo can't use).
 5. Board, copied from the private `Project template` project:
    1. Look for an existing project titled `<name>`
       (`gh project list --owner <owner> --format json`). If one exists,
-      don't copy: record its `project_number` and `project_id`.
+      don't copy: record its `project_number` and `project_id`, then
+      continue at sub-step 4.
    2. Otherwise look up the template by its exact title in the same list.
-      Several projects with that title is an error: stop and say so.
+      Several projects with that title is an error: stop and say so. If
+      there's none, follow "Without the template" below.
    3. Copy it with the `copyProjectV2` GraphQL mutation
       (`includeDraftIssues: false`, the template's id as `projectId`, the
       owner's id as `ownerId`, `title: "<name>"`), then make the copy
@@ -61,6 +63,15 @@ the security features a private repo can't use).
    6. Fail loudly if the Status options aren't exactly Backlog, Ready,
       In progress, In review and Done. Never rewrite them: the mutation
       regenerates option ids.
+   **Without the template** (the user chose this at the plan): instead of
+   sub-steps 2 and 3, run
+   `gh project create --owner <owner> --title "<name>" --format json` and
+   record `project_number` and `project_id`. Then continue at sub-step 4,
+   but before the options check, set the Status options to Backlog, Ready,
+   In progress, In review, Done with the `updateProjectV2Field` GraphQL
+   mutation (only if they differ: the mutation regenerates option ids),
+   and read the field again so `status_field_id`, `in_progress_option` and
+   `in_review_option` come from the new options.
 6. Repository variables for the board sync workflow, from the recorded ids:
    `gh variable set PROJECT_ID`, `PROJECT_STATUS_FIELD_ID`,
    `PROJECT_IN_PROGRESS_OPTION` and `PROJECT_IN_REVIEW_OPTION`, each with
@@ -122,6 +133,14 @@ create or configure them.
 **Do:** open the project → ⋯ → Workflows → **Auto-add to project**, set it
 to this repository with the filter `is:issue`, and enable it.
 
+**Without the template:** the board has no workflows or views, so the user
+also does these by hand:
+1. Enable **Item added to project** (Status: Backlog), **Item closed**
+   (Status: Done), **Pull request merged** (Status: Done) and
+   **Auto-archive items** (filter `is:closed updated:<@today-2w`).
+2. Create the four views from the tables in
+   `docs/runbooks/board-template.md`.
+
 **Verify (Claude runs):**
 `gh api graphql -f query='query($n:Int!){ user(login:"<owner>"){ projectV2(number:$n){ workflows(first:20){ nodes{ name enabled } } } } }' -F n=<project_number> --jq '.data.user.projectV2.workflows.nodes[] | select(.enabled) | .name'`
 **Expected:** exactly these eight names are listed: Auto-add sub-issues to
@@ -130,3 +149,6 @@ added to project, Item closed, Pull request linked to issue, Pull request
 merged. The API doesn't expose each workflow's settings, so ask the user to
 confirm by eye that Auto-add's filter is `is:issue` for this repository and
 that Auto-archive items' filter is `is:closed updated:<@today-2w`.
+Without the template, expect exactly these five instead: Item added to
+project, Item closed, Pull request merged, Auto-add to project, Auto-archive
+items.

@@ -146,8 +146,7 @@ steps count as settled. If the saved answers lack one the interview now asks
      (`gh project list --owner <owner> --format json`), a plan warning: new
      boards are copied from it. The user chooses between stopping to create
      one (see `docs/runbooks/board-template.md` in this plugin's repository)
-     and today's path: an empty board with the Status options set, and
-     every workflow and view done by hand;
+     and the "Without the template" fallback in core's MODULE.md;
    - the "as at" date in `modules/core/templates/LICENSE-SCHEDULE.md`; warn
      if it's more than six months old;
    - that the initial commit is pushed straight to `main` once, before
