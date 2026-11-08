@@ -207,9 +207,21 @@ test("rotation trashes the old item only after the secrets are set", async () =>
   assert.ok(deps.calls[trash].args.includes("old"));
 });
 
-test("rotation with no existing item is an error before anything is created", async () => {
+test("rotation with no earlier item creates one and trashes nothing", async () => {
   const ctx = loadContext(projectDir());
   const deps = stubDeps(vaultResponder());
-  await assert.rejects(storeThenSet(deps, newVault(deps), ctx, options({ rotate: true })), /No active item/);
-  assert.ok(deps.calls.every(c => !isCall(c, "item", "create")));
+  await storeThenSet(deps, newVault(deps), ctx, options({ rotate: true }));
+  assert.ok(deps.calls.some(c => isCall(c, "item", "create")));
+  assert.ok(deps.calls.every(c => !isCall(c, "item", "trash")));
+  assert.match(deps.logs.join("\n"), /No earlier release App in Pass: creating one/);
+});
+
+test("an item left by a failed run stops a plain re-run before anything is created", async () => {
+  const ctx = loadContext(projectDir());
+  const deps = stubDeps(vaultResponder({ items: [item("old", "release App")] }));
+  await assert.rejects(
+    storeThenSet(deps, newVault(deps), ctx, options()),
+    { message: "An earlier run left release App in Pass but didn't finish setting the secrets: re-run with --rotate to replace it" },
+  );
+  assert.ok(deps.calls.every(c => !isCall(c, "item", "create") && c.cmd !== "gh"));
 });
