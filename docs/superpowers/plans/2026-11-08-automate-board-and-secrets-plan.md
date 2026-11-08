@@ -1,6 +1,12 @@
 # Automate the board and the secrets: implementation plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** follows `docs/working-with-claude.md`. One Sonnet-class subagent
+> (`model: sonnet`, in its own worktree) implements the tasks in order. The
+> main session sends each next task, and any fix, to that same subagent as a
+> follow-up. It reviews each task's diff and real test output before sending the next,
+> and does Tasks 1, 6 Step 1, 7 and 10 itself, because they're live actions,
+> security-sensitive or need the user. No other subagents and no sub-sessions.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** new boards are copied from a template board, and a
 user-run script makes each project's credentials, stores them in Proton
