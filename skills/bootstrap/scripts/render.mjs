@@ -67,35 +67,6 @@ function pythonPackage(slug) {
 
 const DEFAULT_LICENSOR = "Ravendarque (https://github.com/ravendarque)";
 
-const LINK = "[workflow](docs/workflow.md#pull-requests)";
-
-export const MERGE_POLICIES = {
-  claude: {
-    rule: [
-      "- Claude merges a PR once it meets the definition of done and every required",
-      "  check passes, including PRs that cut a release. This is standing approval:",
-      "  it asks first only when it needs the maintainer's input.",
-    ],
-    index: `- Merge a PR yourself once it meets the definition of done and every required check passes, release PRs included; this is standing approval: ${LINK}.`,
-  },
-  "claude-except-release": {
-    rule: [
-      "- Claude merges a PR once it meets the definition of done and every required",
-      "  check passes. It asks the maintainer before merging a PR that cuts a release",
-      "  (any label but `release: none`). This is standing approval for every other",
-      "  merge.",
-    ],
-    index: `- Merge a PR yourself once it meets the definition of done and every required check passes, but ask the maintainer before merging one that cuts a release; this is standing approval for every other merge: ${LINK}.`,
-  },
-  maintainer: {
-    rule: [
-      "- The maintainer merges every PR. Claude marks a PR ready once it meets the",
-      "  definition of done, and stops there.",
-    ],
-    index: `- Never merge a PR: mark it ready and leave the merge to the maintainer: ${LINK}.`,
-  },
-};
-
 function escapeHtml(text) {
   return text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
@@ -138,10 +109,6 @@ export function validateAnswers(input, { maxSlugLength: limit = 63 } = {}) {
     greeting_kotlin: kotlinString(`Hello from ${name}`),
     name_android: androidString(name),
     ...(typeof input.application_id === "string" && { application_id_path: input.application_id.replace(/\./g, "/") }),
-    ...(Object.hasOwn(MERGE_POLICIES, input.merge_policy ?? "") && {
-      merge_rule: MERGE_POLICIES[input.merge_policy].rule.join("\n"),
-      merge_index: MERGE_POLICIES[input.merge_policy].index,
-    }),
   };
   return { answers, slug };
 }
@@ -197,6 +164,16 @@ function deepMerge(base, extra) {
   return merged;
 }
 
+export function mergePolicies(modules) {
+  return modules.find(m => m.mergePolicies)?.mergePolicies ?? {};
+}
+
+function mergePolicyKeys(modules, policy) {
+  const policies = mergePolicies(modules);
+  if (!Object.hasOwn(policies, policy ?? "")) return {};
+  return { merge_rule: policies[policy].rule.join("\n"), merge_index: policies[policy].index };
+}
+
 function deriveKeys(modules, answers, modulesDir) {
   const checks = [
     ...new Set(
@@ -220,6 +197,7 @@ function deriveKeys(modules, answers, modulesDir) {
       noneAllowed: [...new Set(modules.flatMap(m => m.releasePaths?.noneAllowed ?? []))],
       noneForbidden: [...new Set(modules.flatMap(m => m.releasePaths?.noneForbidden ?? []))],
     }),
+    ...mergePolicyKeys(modules, answers.merge_policy),
     ...(answers.owner && { repo_url: `https://github.com/${answers.owner}/${answers.slug}` }),
   };
 }

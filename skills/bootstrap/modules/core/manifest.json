@@ -2,6 +2,32 @@
   "name": "core",
   "dependsOn": [],
   "questions": [],
+  "mergePolicies": {
+    "claude": {
+      "rule": [
+        "- Claude merges a PR once it meets the definition of done and every required",
+        "  check passes, including PRs that cut a release. This is standing approval:",
+        "  it asks first only when it needs the maintainer's input."
+      ],
+      "index": "- Merge a PR yourself once it meets the definition of done and every required check passes, release PRs included; this is standing approval: [workflow](docs/workflow.md#pull-requests)."
+    },
+    "claude-except-release": {
+      "rule": [
+        "- Claude merges a PR once it meets the definition of done and every required",
+        "  check passes. It asks the maintainer before merging a PR that cuts a release",
+        "  (any label but `release: none`). This is standing approval for every other",
+        "  merge."
+      ],
+      "index": "- Merge a PR yourself once it meets the definition of done and every required check passes, but ask the maintainer before merging one that cuts a release; this is standing approval for every other merge: [workflow](docs/workflow.md#pull-requests)."
+    },
+    "maintainer": {
+      "rule": [
+        "- The maintainer merges every PR. Claude marks a PR ready once it meets the",
+        "  definition of done, and stops there."
+      ],
+      "index": "- Never merge a PR: mark it ready and leave the merge to the maintainer: [workflow](docs/workflow.md#pull-requests)."
+    }
+  },
   "files": [
     {
       "from": "templates/CLAUDE.md",
