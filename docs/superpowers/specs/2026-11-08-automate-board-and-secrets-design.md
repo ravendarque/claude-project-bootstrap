@@ -352,9 +352,14 @@ to the Pass item in the app.
   keep their ids and order. Only their **Do** text changes.
 - **Vault:**
   - `Dev` is the default, and `--vault` overrides it.
-  - Items are found by exact title within the project's folder. Zero
-    matches on `--rotate`, or two or more at any time, is an error. So
-    are two or more folders named `<slug>`.
+  - Items are found by exact title within the project's folder. Two or
+    more active items, or two or more folders named `<slug>`, is an
+    error.
+  - On `--rotate` with no earlier item (for example, secrets that were set
+    by hand), the script creates one and has nothing to trash.
+  - Without `--rotate`, an item left by a failed earlier run stops the
+    step before anything is created, and the error says to re-run with
+    `--rotate`.
   - The preflight checks that `pass-cli` exists and is logged in, and
     stops if it isn't.
 

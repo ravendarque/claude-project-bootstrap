@@ -40,8 +40,10 @@ GraphQL APIs.
 - Store a credential in Pass first, then set it in GitHub.
 - The vault defaults to `Dev`, overridable with `--vault`. Each project
   gets a folder named `<slug>`, and items are titled by purpose.
-- Two or more active items with the same title in the folder is an error.
-  So is having no item on `--rotate`, or two or more `<slug>` folders.
+- Two or more active items with the same title in the folder is an error,
+  and so are two or more `<slug>` folders.
+- `--rotate` with no earlier item creates one. Without `--rotate`, an item
+  left by a failed run is an error that points to `--rotate`.
 - Step ids stay the same. Only each step's **Do** text changes, and the
   old instructions move to a "By hand" fallback.
 - Claude never runs `secrets.mjs` and never marks steps done on the
