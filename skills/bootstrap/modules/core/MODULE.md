@@ -63,6 +63,7 @@ the security features a private repo can't use).
    6. Fail loudly if the Status options aren't exactly Backlog, Ready,
       In progress, In review and Done. Never rewrite them: the mutation
       regenerates option ids.
+
    **Without the template** (the user chose this at the plan): instead of
    sub-steps 2 and 3, run
    `gh project create --owner <owner> --title "<name>" --format json` and
