@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { awaitInstallation, buildManifest, convertManifest, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
 import { orgVariableExists, setOrgSecret, setOrgVariable } from "../github.mjs";
-import { storeThenSet } from "../order.mjs";
+import { storeAppThenSet } from "../order.mjs";
 
 const SECRET = "BOARD_SYNC_APP_PRIVATE_KEY";
 const VARIABLE = "BOARD_SYNC_APP_CLIENT_ID";
@@ -73,7 +73,7 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
     },
   });
   const app = await convertManifest(deps, code);
-  await storeThenSet(deps, vault, ctx, {
+  await storeAppThenSet(deps, vault, ctx, app, {
     title: TITLE,
     fields: [
       { name: "App id", value: String(app.id), hidden: false },

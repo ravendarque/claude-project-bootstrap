@@ -271,3 +271,20 @@ test("board-app resume without an App URL sets the values and tells you to insta
   assert.ok(!fetched.some(f => f.url.endsWith("/app/installations")));
   assert.match(deps.logs.join("\n"), /no App URL: open the App's settings/);
 });
+
+test("board-app tells you how to recover when Pass fails after the App was created", async () => {
+  const c = ctx();
+  const { deps, done } = harness();
+  const base = deps.exec;
+  deps.exec = async (cmd, args, options) => (cmd === "pass-cli" && args[0] === "item" && args[1] === "create" ? { status: 1, stderr: "pass is down" } : base(cmd, args, options));
+  await assert.rejects(runBoardApp(c, deps), error => {
+    assert.match(error.message, /The App one-org-board-sync exists on GitHub but its key wasn't stored \(.*pass is down.*\)\. Delete it at https:\/\/github\.com\/apps\/one-org-board-sync\/advanced, then re-run this step\./);
+    assert.ok(error.cause);
+    assert.ok(!error.message.includes("PRIVATE KEY"));
+    return true;
+  });
+  await done();
+  assert.ok(!deps.calls.some(call => call.args[0] === "secret"));
+  for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")), "no argument carries the PEM");
+  assert.ok(!deps.logs.join("\n").includes("PRIVATE KEY"));
+});

@@ -181,3 +181,20 @@ test("release-app creates the App under the organisation when the owner is one",
   await done();
   assert.match(pages[0], /action="https:\/\/github\.com\/organizations\/sample-owner\/settings\/apps\/new\?state=[0-9a-f]+"/);
 });
+
+test("release-app tells you how to recover when Pass fails after the App was created", async () => {
+  const c = ctx();
+  const { deps, done } = stepHarness();
+  const base = deps.exec;
+  deps.exec = async (cmd, args, options) => (cmd === "pass-cli" && args[0] === "item" && args[1] === "create" ? { status: 1, stderr: "pass is down" } : base(cmd, args, options));
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await assert.rejects(releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 }), error => {
+    assert.match(error.message, /The App sample-project-release exists on GitHub but its key wasn't stored \(.*pass is down.*\)\. Delete it at https:\/\/github\.com\/apps\/sample-project-release\/advanced, then re-run this step\./);
+    assert.ok(error.cause);
+    return true;
+  });
+  await done();
+  assert.ok(!deps.calls.some(call => call.args[0] === "secret"));
+  for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")), "no argument carries the PEM");
+  assert.ok(!deps.logs.join("\n").includes("PRIVATE KEY"));
+});

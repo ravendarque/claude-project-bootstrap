@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { buildManifest, convertManifest, newAppUrl, ownerType, verifyInstallation, waitForCallback } from "../github-app.mjs";
-import { storeThenSet } from "../order.mjs";
+import { storeAppThenSet } from "../order.mjs";
 
 export { appJwt, buildManifest, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
 
@@ -23,7 +23,7 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
     },
   });
   const app = await convertManifest(deps, code);
-  await storeThenSet(deps, vault, ctx, {
+  await storeAppThenSet(deps, vault, ctx, app, {
     title: "release App",
     fields: [
       { name: "App id", value: String(app.id), hidden: false },
