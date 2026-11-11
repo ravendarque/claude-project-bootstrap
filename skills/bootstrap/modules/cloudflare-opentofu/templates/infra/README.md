@@ -22,7 +22,8 @@ State lives in the R2 bucket `{{slug}}-tfstate`, never in git.
 
 1. The zone `{{zone_name}}` is active on Cloudflare.
 2. Create the CI tokens below, the R2 state credentials, and the GitHub
-   secrets and variables.
+   secrets and variables: `node <plugin>/skills/bootstrap/scripts/secrets.mjs cloudflare-tokens <project dir>`
+   does the CI tokens, or follow this page by hand.
 3. Run "Bootstrap OpenTofu state bucket".
 4. Run "Infra" (dispatch it, or merge a change under `infra/`).
 5. Add the DS record from `tofu output app_dnssec_ds_record` at the
@@ -38,8 +39,10 @@ account and, for zone permissions, to `{{zone_name}}` only.
 |---|---|---|
 | Preview | `CLOUDFLARE_PREVIEW_TOKEN` (repository) | Account: Workers Scripts Edit, Account Settings Read |
 | Deploy | `CLOUDFLARE_DEPLOY_TOKEN` (environments `production`, and `beta` if used) | Account: Workers Scripts Edit, Account Settings Read. Zone: Workers Routes Edit |
-| Infra plan | `CLOUDFLARE_INFRA_PLAN_TOKEN` (repository) | The read-only version of each infra apply permission |
-| Infra apply | `CLOUDFLARE_INFRA_APPLY_TOKEN` (environment `infra`) | Account: Workers R2 Storage Edit. Zone: DNS Edit, Zone Settings Edit, Zone WAF Edit, Transform Rules Edit, Cache Settings Edit |
+| Infra plan | `CLOUDFLARE_INFRA_PLAN_TOKEN` (repository) | Account: Workers R2 Storage Read, Transform Rules Read. Zone: DNS Read, Zone Settings Read, Zone WAF Read, Cache Settings Read |
+| Infra apply | `CLOUDFLARE_INFRA_APPLY_TOKEN` (environment `infra`) | Account: Workers R2 Storage Edit, Transform Rules Edit. Zone: DNS Edit, Zone Settings Edit, Zone WAF Edit, Cache Settings Edit |
+
+Transform Rules is account-scoped, so the infra tokens' Transform Rules permission covers every zone in the account, not just `{{zone_name}}`.
 
 If a plan or apply fails with an authorisation error, the error names the
 missing permission: add exactly that one.
@@ -51,7 +54,7 @@ Create a new token instead. Check a token's real contents with
 
 ### R2 state credentials
 
-Create two R2 API tokens (R2 → Manage R2 API Tokens), both limited to the
+`node <plugin>/skills/bootstrap/scripts/secrets.mjs cloudflare-r2 <project dir>` creates both and sets the secrets. By hand, create two R2 API tokens (R2 → Manage R2 API Tokens), both limited to the
 `{{slug}}-tfstate` bucket:
 
 | Token | Permission | GitHub secrets |

@@ -114,3 +114,17 @@ test("a core-only CLAUDE.md has no empty Stack section", () => {
 test("the licence notice uses the licensor answer", () => {
   assert.match(read("LICENSE.md"), /^Required Notice: Copyright Ravendarque \(https:\/\/github\.com\/ravendarque\)$/m);
 });
+
+test("the workflow doc uses the board's status names", () => {
+  const doc = read("docs/workflow.md");
+  assert.match(doc, /\*\*In progress\*\*/);
+  assert.match(doc, /\*\*In review\*\*/);
+  assert.doesNotMatch(doc, /In Progress|In Review/);
+});
+
+test("the workflow doc explains the board views and title prefixes", () => {
+  const doc = read("docs/workflow.md");
+  for (const term of ["[EPIC]", "[BUG]", "[CHORE]", "Priority", "Size", "Estimate", "No parent epic"]) {
+    assert.ok(doc.includes(term), `${term} should be explained`);
+  }
+});

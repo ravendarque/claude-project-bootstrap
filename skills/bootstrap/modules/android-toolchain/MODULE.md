@@ -100,6 +100,8 @@ After core's configuration. Step `github:android-toolchain:1`.
    **Fallback, only if the create or a verification fails** (typically a free
    private repository): record the step skipped with
    `node scripts/state.mjs skip <dir> github:android-toolchain:1 "environment branch policy not available: <what failed>"`,
+   record it for the secrets script with
+   `node scripts/state.mjs record <dir> skipped_envs release`,
    remove the `environment: release` line from `release-artefacts.yml` on the
    first PR's branch, set the secrets at repository level (the manual step
    says how), and add a row to `docs/threat-model.md`'s STRIDE table: threat
@@ -116,7 +118,13 @@ After core's configuration. Step `github:android-toolchain:1`.
 **Why:** the release workflow can't sign the APK without it, and Android
 only installs an update signed with the same key as the installed app.
 
-**Do:** on your own machine, never in the conversation:
+**Do:** run
+`node <skill dir>/scripts/secrets.mjs android-keystore <project dir>`. It
+makes the keystore with a random password, stores both in Proton Pass and
+sets the four secrets. Then make an offline backup of the keystore from the
+Pass item: if it's lost, existing installs can't update.
+
+**By hand:** on your own machine, never in the conversation:
 1. Create the keystore outside the repository, with a strong password you
    keep in your password manager:
    `keytool -genkeypair -v -keystore <slug>-upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000`

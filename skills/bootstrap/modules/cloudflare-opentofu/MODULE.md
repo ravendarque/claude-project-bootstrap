@@ -118,6 +118,8 @@ After core's configuration. Steps `github:cloudflare-opentofu:<n>`.
    environments aren't available), and for no other reason:
    - record each environment that failed as skipped:
      `node scripts/state.mjs skip <dir> github:cloudflare-opentofu:1 "environment branch policy not available: <what failed>"`;
+   - record the skipped environments for the secrets script:
+     `node scripts/state.mjs record <dir> skipped_envs <comma list of skipped environments>`;
    - set the secrets of a skipped environment at repository level (the
      manual steps say how);
    - add a row to `docs/threat-model.md`'s STRIDE table, after the existing
@@ -141,7 +143,17 @@ same steps for later rebuilds.
 **Why:** CI needs separate least-privilege credentials for previews,
 deploys, and the infrastructure plan and apply.
 
-**Do:** In the Cloudflare dashboard → My Profile → API Tokens (or Manage
+**Do:** make the bootstrap token: Cloudflare dashboard → Manage Account →
+Account API Tokens → Create Token → Custom token. Its only permission is
+Account: Account API Tokens: Edit, and it expires today. Then run
+`node <skill dir>/scripts/secrets.mjs cloudflare-tokens <project dir>`.
+Paste the bootstrap token at the hidden prompt, and give the account id and
+zone id from the zone's Overview page when asked. The script creates the
+four tokens, reads each back to check its policies, stores them in Proton
+Pass, sets the secrets and the `CLOUDFLARE_ACCOUNT_ID` variable, and deletes
+the bootstrap token.
+
+**By hand:** In the Cloudflare dashboard → My Profile → API Tokens (or Manage
 Account → Account API Tokens for account-owned tokens) → Create Token →
 Custom token. Create four tokens, each with a one-year expiry, scoped to
 this account and, for zone permissions, to `<zone_name>` only. The exact
@@ -159,12 +171,9 @@ If github:cloudflare-opentofu:1 recorded an environment as skipped (its
 fallback), drop `--env <name>` for that environment's secrets and set them
 at repository level.
 
-**Verify (Claude runs):** ask the user to run, for each token,
-`curl -s -H "Authorization: Bearer <token>" https://api.cloudflare.com/client/v4/user/tokens/verify | jq .result.status`
-themselves (so the token never enters the conversation), then run
-`gh secret list --repo $R` and `gh secret list --repo $R --env production`
-(and `infra`, `beta`).
-**Expected:** each verify prints `"active"`; every secret is listed in the
+**Verify (Claude runs):** `gh secret list --repo $R` and
+`gh secret list --repo $R --env production` (and `infra`, `beta`).
+**Expected:** every secret is listed in the
 right place.
 
 ### cloudflare-opentofu:2 Create the state bucket
@@ -182,7 +191,14 @@ right place.
 **Why:** the state backend reads and writes state through R2's S3 API.
 PR plans get a read-only pair, so PR code can't rewrite state.
 
-**Do:** Cloudflare dashboard → R2 → Manage R2 API Tokens. Create two
+**Do:** make a fresh bootstrap token as in step 1 (only Account: Account API
+Tokens: Edit, expiring today), then run
+`node <skill dir>/scripts/secrets.mjs cloudflare-r2 <project dir>` and paste
+it at the hidden prompt, with the account id when asked. The script creates
+the two bucket-scoped tokens, derives the S3 key pairs, stores them in
+Proton Pass, sets the four secrets, and deletes the bootstrap token.
+
+**By hand:** Cloudflare dashboard → R2 → Manage R2 API Tokens. Create two
 tokens, both applied to the `<slug>-tfstate` bucket only:
 1. Object Read & Write. Then
    `gh secret set TF_STATE_ACCESS_KEY_ID --repo $R --env infra` and

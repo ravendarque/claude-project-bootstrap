@@ -5,14 +5,34 @@
 - Every change needs a GitHub issue before work starts.
 - The project board's Status moves with the work:
   - **Ready**: the issue has enough information to pick up;
-  - **In Progress**: a branch exists (set automatically when the branch
+  - **In progress**: a branch exists (set automatically when the branch
     name contains the issue number);
-  - **In Review**: a PR is open (set automatically);
+  - **In review**: a PR is open (set automatically);
   - **Done**: set by the board's built-in workflows on merge or close.
 - Scope issues from the real code, not from memory. Write acceptance criteria
   that can be checked against the repo. State what's out of scope and why.
 - When later work shows an earlier issue was wrong or too narrow, update that
   issue rather than letting it go stale.
+
+### The board
+
+The board has four views:
+
+- **Board**: columns by Status, sorted by Priority;
+- **Epics**: open epics, sorted by Status;
+- **No parent epic**: open issues that have no parent epic and aren't epics
+  themselves, so it shows what still needs filing under one;
+- **Bugs & Chores**: open issues titled `[BUG]` or `[CHORE]`.
+
+Each item has three fields besides Status:
+
+- **Priority**: P0, P1 or P2;
+- **Size**: XS, S, M, L or XL;
+- **Estimate**: a number.
+
+Epics are parent issues titled `[EPIC] …`, with the work under them as
+sub-issues. Title a bug `[BUG] …` and a chore `[CHORE] …` so the Bugs &
+Chores view finds them.
 
 ## Branches
 
