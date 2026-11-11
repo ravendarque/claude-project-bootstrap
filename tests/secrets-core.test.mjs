@@ -254,3 +254,17 @@ test("the hidden prompt handles backspace, Ctrl-C and Ctrl-D", () => {
   assert.deepEqual(consumeHidden("abc", "\u0004"), { answer: "abc", done: "enter" });
   assert.deepEqual(consumeHidden("", "\u0004"), { answer: "", done: "cancel" });
 });
+
+test("the vault is listed once per change, not once per lookup", async () => {
+  const ctx = loadContext(projectDir());
+  const lists = deps => deps.calls.filter(c => isCall(c, "item", "list")).length;
+  const plain = stubDeps(vaultResponder());
+  const vault = newVault(plain);
+  for (const n of [1, 2, 3, 4]) await storeThenSet(plain, vault, ctx, options({ title: `item ${n}` }));
+  assert.ok(lists(plain) <= 1 + 4, `listed ${lists(plain)} times`);
+  const items = [1, 2, 3, 4].map(n => item(`old${n}`, `item ${n}`));
+  const rotating = stubDeps(vaultResponder({ items }));
+  const rotated = newVault(rotating);
+  for (const n of [1, 2, 3, 4]) await storeThenSet(rotating, rotated, ctx, options({ title: `item ${n}`, rotate: true }));
+  assert.ok(lists(rotating) <= 1 + 2 * 4, `listed ${lists(rotating)} times`);
+});

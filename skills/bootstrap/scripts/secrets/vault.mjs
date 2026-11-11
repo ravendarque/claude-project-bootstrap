@@ -16,6 +16,7 @@ function parseItems(stdout) {
 
 export class Vault {
   #folderId;
+  #items = null;
 
   constructor(deps, { vault, folder }) {
     this.deps = deps;
@@ -42,10 +43,17 @@ export class Vault {
     return this.#folderId;
   }
 
-  async #activeIds(title) {
+  async #folderItems({ refresh = false } = {}) {
     const folderId = await this.folderId();
-    const out = await pass(this.deps, ["item", "list", "--vault-name", this.vault, "--filter-state", "active", "--output", "json"]);
-    return parseItems(out).filter(entry => entry.folderId === folderId && entry.title === title).map(entry => entry.id);
+    if (!this.#items || refresh) {
+      const out = await pass(this.deps, ["item", "list", "--vault-name", this.vault, "--filter-state", "active", "--output", "json"]);
+      this.#items = parseItems(out).filter(entry => entry.folderId === folderId);
+    }
+    return this.#items;
+  }
+
+  async #activeIds(title, options) {
+    return (await this.#folderItems(options)).filter(entry => entry.title === title).map(entry => entry.id);
   }
 
   async find(title) {
@@ -69,7 +77,7 @@ export class Vault {
       extra_fields: [],
     };
     await pass(this.deps, ["item", "create", "custom", "--from-template", "-", "--vault-name", this.vault, "--folder-id", folderId], JSON.stringify(template));
-    const created = (await this.#activeIds(title)).filter(id => !before.has(id));
+    const created = (await this.#activeIds(title, { refresh: true })).filter(id => !before.has(id));
     if (created.length !== 1) throw new Error(`Created ${title} in Pass but could not identify the new item: check folder ${this.folder} in vault ${this.vault}`);
     return created[0];
   }
@@ -81,5 +89,6 @@ export class Vault {
 
   async trash(itemId) {
     await pass(this.deps, ["item", "trash", "--vault-name", this.vault, "--item-id", itemId]);
+    this.#items = null;
   }
 }
