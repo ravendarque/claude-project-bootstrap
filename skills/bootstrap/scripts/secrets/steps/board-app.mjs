@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { appSettingsUrl, awaitInstallation, buildManifest, convertManifest, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
+import { appSettingsUrl, awaitInstallation, buildManifest, convertManifest, fetchApp, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
 import { orgVariableExists, setOrgSecret, setOrgVariable } from "../github.mjs";
 import { storeAppThenSet } from "../order.mjs";
 
@@ -36,6 +36,8 @@ async function resume(ctx, deps, vault, itemId, options) {
   const clientId = await vault.field(itemId, "client id");
   const pem = await vault.field(itemId, "private key");
   const htmlUrl = await vault.field(itemId, "App URL").catch(() => "");
+  const existing = await fetchApp(deps, { clientId, pem });
+  if (!existing.ok) throw new Error(`The board-sync App in Pass no longer exists on GitHub (HTTP ${existing.status}): move the Pass item to the bin, then re-run`);
   await setOrgSecret(deps, ctx.owner, SECRET, pem);
   await setOrgVariable(deps, ctx.owner, VARIABLE, clientId);
   if (!htmlUrl) {

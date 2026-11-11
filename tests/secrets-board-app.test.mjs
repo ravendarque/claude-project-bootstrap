@@ -18,7 +18,7 @@ const ctx = options => loadContext(projectDir({ owner: "one-org", owner_type: "O
 const json = body => ({ ok: true, status: 200, json: async () => body });
 const OPTIONS = { pollIntervalMs: 1, pollLimitMs: 50 };
 
-function harness({ ownerKind = "Organization", installed = true, selection = "all", variableExists = false, listFails = false, installations = "one-org-board-sync\tall\n", items = [], folders = [], appUrl = "https://github.com/apps/one-org-board-sync" } = {}) {
+function harness({ ownerKind = "Organization", installed = true, selection = "all", variableExists = false, listFails = false, appStatus = 200, installations = "one-org-board-sync\tall\n", items = [], folders = [], appUrl = "https://github.com/apps/one-org-board-sync" } = {}) {
   const fetched = [];
   const pages = [];
   const opened = [];
@@ -39,6 +39,7 @@ function harness({ ownerKind = "Organization", installed = true, selection = "al
   let driver;
   deps.fetch = async (url, init = {}) => {
     fetched.push({ url, init });
+    if (url === "https://api.github.com/app") return { ok: appStatus === 200, status: appStatus, json: async () => ({ slug: "one-org-board-sync" }) };
     if (url.endsWith("/users/one-org")) return json({ type: ownerKind });
     if (url.endsWith("/conversions")) return json({ id: 8, client_id: "Iv1.board", pem: privateKey, html_url: "https://github.com/apps/one-org-board-sync", slug: "one-org-board-sync" });
     if (url.endsWith("/app/installations")) return json(installed ? [{ id: 5, account: { login: "one-org" }, repository_selection: selection }] : []);
@@ -337,4 +338,20 @@ test("a failed org write after the Pass item exists is still marked stored, with
     return true;
   });
   await done();
+});
+
+test("board-app resume checks the stored App still exists with a JWT from the stored key", async () => {
+  const { deps, fetched } = harness(earlierItem);
+  await runBoardApp(ctx(), deps);
+  const check = fetched.find(f => f.url === "https://api.github.com/app");
+  assert.match(check.init.headers.Authorization, /^Bearer [\w-]+\.[\w-]+\.[\w-]+$/);
+  const claims = JSON.parse(Buffer.from(check.init.headers.Authorization.split(".")[1], "base64url"));
+  assert.equal(claims.iss, "Iv1.board");
+});
+
+test("board-app resume sets nothing when the stored App no longer exists on GitHub", async () => {
+  const { deps, opened } = harness({ ...earlierItem, appStatus: 404 });
+  await assert.rejects(runBoardApp(ctx(), deps), /The board-sync App in Pass no longer exists on GitHub \(HTTP 404\): move the Pass item to the bin, then re-run/);
+  assert.ok(!deps.calls.some(call => call.args[0] === "secret" || (call.args[0] === "variable" && call.args[1] === "set")));
+  assert.deepEqual(opened, []);
 });

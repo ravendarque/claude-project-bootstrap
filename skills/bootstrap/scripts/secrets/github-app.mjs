@@ -109,6 +109,11 @@ async function api(deps, path, token, init = {}) {
   return response.json();
 }
 
+export async function fetchApp(deps, { clientId, pem }) {
+  const response = await deps.fetch(`${API}/app`, { headers: { ...API_HEADERS, Authorization: `Bearer ${appJwt(clientId, pem, deps.now())}` } });
+  return { ok: response.ok, status: response.status };
+}
+
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function awaitInstallation(deps, owner, { clientId, pem }, { intervalMs = 5000, limitMs = 10 * 60 * 1000, notInstalledHint } = {}) {
