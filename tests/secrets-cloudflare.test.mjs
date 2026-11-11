@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { loadContext } from "../skills/bootstrap/scripts/secrets/context.mjs";
 import { saveRun } from "../skills/bootstrap/scripts/state.mjs";
 import { Vault } from "../skills/bootstrap/scripts/secrets/vault.mjs";
-import { buildPolicies, cfClient, resolvePermissions, withBootstrapToken } from "../skills/bootstrap/scripts/secrets/cloudflare.mjs";
+import { createHash } from "node:crypto";
+import { buildPolicies, bucketResource, cfClient, resolvePermissions, s3Credentials, withBootstrapToken } from "../skills/bootstrap/scripts/secrets/cloudflare.mjs";
+import cloudflareR2 from "../skills/bootstrap/scripts/secrets/steps/cloudflare-r2.mjs";
 import cloudflareTokens from "../skills/bootstrap/scripts/secrets/steps/cloudflare-tokens.mjs";
 import { renderReal } from "./helpers.mjs";
 import { stubDeps, vaultResponder } from "./helpers-secrets.mjs";
@@ -13,6 +15,7 @@ const ZONE = "b".repeat(32);
 const BOOTSTRAP = "boot-secret-token";
 const ACCOUNT_SCOPE = "com.cloudflare.api.account";
 const ZONE_SCOPE = "com.cloudflare.api.account.zone";
+const R2_SCOPE = "com.cloudflare.edge.r2.bucket";
 
 const NAMES = {
   [ACCOUNT_SCOPE]: ["Workers Scripts Write", "Account Settings Read", "Workers R2 Storage Read", "Workers R2 Storage Write", "Transform Rules Read", "Transform Rules Write"],
@@ -20,6 +23,8 @@ const NAMES = {
 };
 const GROUPS = [
   ...Object.entries(NAMES).flatMap(([scope, names]) => names.map(name => ({ id: `pg-${name.replaceAll(" ", "-")}`, name, scopes: [scope] }))),
+  { id: "pg-r2-write", name: "Workers R2 Storage Bucket Item Write", scopes: [R2_SCOPE] },
+  { id: "pg-r2-read", name: "Workers R2 Storage Bucket Item Read", scopes: [R2_SCOPE] },
   { id: "decoy", name: "DNS Read", scopes: ["com.cloudflare.api.user"] },
 ];
 
@@ -64,7 +69,7 @@ function fakeCloudflare({ tamper, failCreateAt, groups = GROUPS } = {}) {
   return { fetch, log, stored };
 }
 
-function harness({ beta = false, cf = fakeCloudflare(), items, skippedEnvs, passAnswers, fail } = {}) {
+function harness({ beta = false, cf = fakeCloudflare(), items, skippedEnvs, passAnswers, fail, step = cloudflareTokens } = {}) {
   const dir = rendered(beta);
   if (skippedEnvs) {
     saveRun(dir, { answers: { owner: "sample-owner", name: "Sample Project", slug: "sample-project", zone_name: "example.test", beta }, modules: ["core"] });
@@ -85,7 +90,7 @@ function harness({ beta = false, cf = fakeCloudflare(), items, skippedEnvs, pass
     throw new Error(`unexpected prompt ${question}`);
   };
   const vault = new Vault(deps, { vault: "Dev", folder: ctx.slug });
-  return { ctx, deps, cf, run: (extra = {}) => cloudflareTokens.run(ctx, deps, { vault, rotate: false, ...extra }) };
+  return { ctx, deps, cf, run: (extra = {}) => step.run(ctx, deps, { vault, rotate: false, ...extra }) };
 }
 
 const label = call => `${call.cmd} ${call.args.slice(0, 2).join(" ")}`;
@@ -281,4 +286,115 @@ test("a revoke that fails is reported for the dashboard", async () => {
   const { deps, run } = harness({ cf, fail: createsItem("Cloudflare Deploy token") });
   await assert.rejects(run(), /pass-cli item create failed/);
   assert.match(deps.logs.join("\n"), /tok3.*revoke it in the dashboard/);
+});
+
+test("s3Credentials derives the key id and the SHA-256 secret", () => {
+  assert.deepEqual(s3Credentials({ id: "abc", value: "secret" }), {
+    accessKeyId: "abc",
+    secretAccessKey: "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+  });
+});
+
+test("bucketResource names the default jurisdiction", () => {
+  assert.equal(bucketResource(ACCOUNT, "sample-project-tfstate"), `com.cloudflare.edge.r2.bucket.${ACCOUNT}_default_sample-project-tfstate`);
+});
+
+test("resolvePermissions can be limited to the R2 bucket scope", async () => {
+  const client = { get: async () => GROUPS };
+  assert.deepEqual(await resolvePermissions(client, ACCOUNT, ["Workers R2 Storage Bucket Item Read"], [R2_SCOPE]), [{ id: "pg-r2-read", scope: R2_SCOPE }]);
+  await assert.rejects(resolvePermissions(client, ACCOUNT, ["Workers R2 Storage Bucket Item Read"]), /matched 0/);
+});
+
+const r2 = options => harness({ step: cloudflareR2, ...options });
+
+test("cloudflare-r2 makes two tokens scoped to the state bucket and reads them back", async () => {
+  const { cf, run } = r2();
+  await run();
+  const posts = cf.log.filter(c => c.method === "POST");
+  assert.deepEqual(posts.map(p => p.body.name), ["sample-project R2 state read-write", "sample-project R2 state read-only"]);
+  const resource = `${R2_SCOPE}.${ACCOUNT}_default_sample-project-tfstate`;
+  assert.deepEqual(posts[0].body.policies, [{ effect: "allow", resources: { [resource]: "*" }, permission_groups: [{ id: "pg-r2-write" }] }]);
+  assert.deepEqual(posts[1].body.policies, [{ effect: "allow", resources: { [resource]: "*" }, permission_groups: [{ id: "pg-r2-read" }] }]);
+  assert.equal(posts[0].body.expires_on, "2027-11-08T12:00:00Z");
+  assert.equal(cf.log.filter(c => c.method === "GET" && /tokens\/tok\d$/.test(c.path)).length, 2);
+  assert.ok(cf.log.some(c => c.path.endsWith("/tokens/self") && c.method === "DELETE"));
+  assert.ok(cf.log.every(c => !/zones/.test(c.path)));
+});
+
+test("read-write goes to infra and read-only to repository level", async () => {
+  const { deps, run } = r2();
+  await run();
+  const secrets = deps.calls.filter(c => c.cmd === "gh").map(c => [c.args[2], c.args.includes("--env") ? c.args[c.args.indexOf("--env") + 1] : null]);
+  assert.deepEqual(secrets, [
+    ["TF_STATE_ACCESS_KEY_ID", "infra"],
+    ["TF_STATE_SECRET_ACCESS_KEY", "infra"],
+    ["TF_STATE_READ_ACCESS_KEY_ID", null],
+    ["TF_STATE_READ_SECRET_ACCESS_KEY", null],
+  ]);
+  const inputs = Object.fromEntries(deps.calls.filter(c => c.cmd === "gh").map(c => [c.args[2], c.input]));
+  assert.equal(inputs.TF_STATE_ACCESS_KEY_ID, "tok1");
+  assert.equal(inputs.TF_STATE_SECRET_ACCESS_KEY, createHash("sha256").update("cfut_value1").digest("hex"));
+  assert.equal(inputs.TF_STATE_READ_ACCESS_KEY_ID, "tok2");
+  assert.equal(inputs.TF_STATE_READ_SECRET_ACCESS_KEY, createHash("sha256").update("cfut_value2").digest("hex"));
+});
+
+test("both R2 pairs go to repository level when infra is skipped", async () => {
+  const { deps, run } = r2({ skippedEnvs: ["infra"] });
+  await run();
+  assert.ok(deps.calls.filter(c => c.cmd === "gh").every(c => !c.args.includes("--env")));
+});
+
+test("the R2 step lists its four secrets", () => {
+  assert.deepEqual(cloudflareR2.secrets(loadContext(rendered())), [
+    { name: "TF_STATE_ACCESS_KEY_ID", env: "infra" },
+    { name: "TF_STATE_SECRET_ACCESS_KEY", env: "infra" },
+    { name: "TF_STATE_READ_ACCESS_KEY_ID" },
+    { name: "TF_STATE_READ_SECRET_ACCESS_KEY" },
+  ]);
+  assert.equal(cloudflareR2.name, "cloudflare-r2");
+});
+
+test("the R2 Pass items hold the S3 pair, not the raw token", async () => {
+  const { deps, run } = r2();
+  await run();
+  const items = deps.calls.filter(c => c.args[0] === "item" && c.args[1] === "create").map(c => JSON.parse(c.input));
+  assert.deepEqual(items.map(i => i.title), ["R2 state read-write", "R2 state read-only"]);
+  assert.deepEqual(items[0].sections[0].fields, [
+    { field_name: "access key id", field_type: "text", value: "tok1" },
+    { field_name: "secret access key", field_type: "hidden", value: createHash("sha256").update("cfut_value1").digest("hex") },
+    { field_name: "token id", field_type: "text", value: "tok1" },
+    { field_name: "expires", field_type: "text", value: "2027-11-08T12:00:00Z" },
+  ]);
+  assert.ok(!JSON.stringify(items).includes("cfut_value"));
+});
+
+test("no R2 secret appears in exec args, logs or errors", async () => {
+  const { deps, run } = r2();
+  await run();
+  const secrets = ["cfut_value1", "cfut_value2", BOOTSTRAP, ...[1, 2].map(n => createHash("sha256").update(`cfut_value${n}`).digest("hex"))];
+  for (const call of deps.calls) for (const secret of secrets) assert.ok(!call.args.some(arg => arg.includes(secret)), `${call.cmd} args`);
+  for (const secret of secrets) assert.ok(!deps.logs.join("\n").includes(secret));
+});
+
+test("an R2 Pass failure at the second token revokes it and keeps the first", async () => {
+  const cf = fakeCloudflare();
+  const { run } = r2({ cf, fail: createsItem("R2 state read-only") });
+  await assert.rejects(run(), /pass-cli item create failed/);
+  assert.deepEqual(deletedTokens(cf).sort(), ["self", "tok2"]);
+});
+
+test("an item left by an earlier run stops a plain R2 re-run before any token is made", async () => {
+  const { cf, run } = r2({ items: [{ id: "old1", title: "R2 state read-only", folder_id: "f1" }] });
+  await assert.rejects(run(), /earlier run left R2 state read-only.*--rotate/);
+  assert.equal(cf.log.length, 0);
+});
+
+test("R2 rotation revokes the old tokens after the secrets are set", async () => {
+  const items = ["R2 state read-write", "R2 state read-only"].map((title, i) => ({ id: `old${i}`, title, folder_id: "f1" }));
+  const { deps, cf, run } = r2({ items, passAnswers: { old0: "oldtok0", old1: "oldtok1" } });
+  await run({ rotate: true });
+  const deletes = cf.log.map((c, index) => ({ ...c, index })).filter(c => c.method === "DELETE" && /oldtok\d/.test(c.path));
+  assert.deepEqual(deletes.map(c => c.path.split("/").at(-1)), ["oldtok0", "oldtok1"]);
+  assert.ok(deps.calls.map(label).lastIndexOf("gh secret set") > -1);
+  assert.ok(cf.log.findIndex(c => c.path.endsWith("tokens/self") && c.method === "DELETE") > deletes.at(-1).index);
 });

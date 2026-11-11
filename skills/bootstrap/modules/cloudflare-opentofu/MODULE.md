@@ -191,7 +191,14 @@ right place.
 **Why:** the state backend reads and writes state through R2's S3 API.
 PR plans get a read-only pair, so PR code can't rewrite state.
 
-**Do:** Cloudflare dashboard → R2 → Manage R2 API Tokens. Create two
+**Do:** make a fresh bootstrap token as in step 1 (only Account: Account API
+Tokens: Edit, expiring today), then run
+`node <skill dir>/scripts/secrets.mjs cloudflare-r2 <project dir>` and paste
+it at the hidden prompt, with the account id when asked. The script creates
+the two bucket-scoped tokens, derives the S3 key pairs, stores them in
+Proton Pass, sets the four secrets, and deletes the bootstrap token.
+
+**By hand:** Cloudflare dashboard → R2 → Manage R2 API Tokens. Create two
 tokens, both applied to the `<slug>-tfstate` bucket only:
 1. Object Read & Write. Then
    `gh secret set TF_STATE_ACCESS_KEY_ID --repo $R --env infra` and

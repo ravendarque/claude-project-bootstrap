@@ -54,7 +54,7 @@ Create a new token instead. Check a token's real contents with
 
 ### R2 state credentials
 
-Create two R2 API tokens (R2 → Manage R2 API Tokens), both limited to the
+`node <plugin>/skills/bootstrap/scripts/secrets.mjs cloudflare-r2 <project dir>` creates both and sets the secrets. By hand, create two R2 API tokens (R2 → Manage R2 API Tokens), both limited to the
 `{{slug}}-tfstate` bucket:
 
 | Token | Permission | GitHub secrets |
