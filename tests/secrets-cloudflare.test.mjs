@@ -64,7 +64,7 @@ function fakeCloudflare({ tamper, failCreateAt, groups = GROUPS } = {}) {
   return { fetch, log, stored };
 }
 
-function harness({ beta = false, cf = fakeCloudflare(), items, skippedEnvs, passAnswers } = {}) {
+function harness({ beta = false, cf = fakeCloudflare(), items, skippedEnvs, passAnswers, fail } = {}) {
   const dir = rendered(beta);
   if (skippedEnvs) {
     saveRun(dir, { answers: { owner: "sample-owner", name: "Sample Project", slug: "sample-project", zone_name: "example.test", beta }, modules: ["core"] });
@@ -73,6 +73,7 @@ function harness({ beta = false, cf = fakeCloudflare(), items, skippedEnvs, pass
   if (skippedEnvs) ctx.skippedEnvs = skippedEnvs;
   const pass = vaultResponder({ items });
   const deps = stubDeps((cmd, args, options) => {
+    if (fail?.(cmd, args, options)) return { status: 1, stderr: "refused" };
     if (cmd === "pass-cli" && args[0] === "item" && args[1] === "view") return { stdout: `${passAnswers?.[args[args.indexOf("--item-id") + 1]] ?? "oldtok"}\n` };
     return pass(cmd, args, options);
   });
@@ -246,4 +247,38 @@ test("rotation revokes the old token ids recorded in the previous items after th
   const lastSecret = deps.calls.map(label).lastIndexOf("gh secret set");
   const trash = deps.calls.map(label).lastIndexOf("pass-cli item trash");
   assert.ok(trash > lastSecret);
+});
+
+const deletedTokens = cf => cf.log.filter(c => c.method === "DELETE").map(c => c.path.split("/").at(-1));
+const createsItem = title => (cmd, args, options) => cmd === "pass-cli" && args[0] === "item" && args[1] === "create" && JSON.parse(options.input).title === title;
+
+test("a Pass failure at the second token revokes it and the two after, and keeps the first", async () => {
+  const cf = fakeCloudflare();
+  const { run } = harness({ cf, fail: createsItem("Cloudflare Deploy token") });
+  await assert.rejects(run(), /pass-cli item create failed/);
+  assert.deepEqual(deletedTokens(cf).sort(), ["self", "tok2", "tok3", "tok4"]);
+});
+
+test("a GitHub failure at the second token keeps it and revokes the two after", async () => {
+  const cf = fakeCloudflare();
+  const { run } = harness({ cf, fail: (cmd, args) => cmd === "gh" && args[2] === "CLOUDFLARE_DEPLOY_TOKEN" });
+  await assert.rejects(run(), /Stored Cloudflare Deploy token in Pass; not set: CLOUDFLARE_DEPLOY_TOKEN/);
+  assert.deepEqual(deletedTokens(cf).sort(), ["self", "tok3", "tok4"]);
+});
+
+test("a failed store during rotation doesn't revoke the old tokens", async () => {
+  const items = ["Preview", "Deploy", "Infra plan", "Infra apply"].map((name, i) => ({ id: `old${i}`, title: `Cloudflare ${name} token`, folder_id: "f1" }));
+  const cf = fakeCloudflare();
+  const { run } = harness({ cf, items, passAnswers: { old0: "oldtok0", old1: "oldtok1" }, fail: createsItem("Cloudflare Deploy token") });
+  await assert.rejects(run({ rotate: true }), /pass-cli item create failed/);
+  assert.ok(deletedTokens(cf).every(id => !id.startsWith("oldtok")));
+});
+
+test("a revoke that fails is reported for the dashboard", async () => {
+  const cf = fakeCloudflare();
+  const inner = cf.fetch;
+  cf.fetch = async (url, init = {}) => (init.method === "DELETE" && url.endsWith("/tok3") ? failed(500, "nope") : inner(url, init));
+  const { deps, run } = harness({ cf, fail: createsItem("Cloudflare Deploy token") });
+  await assert.rejects(run(), /pass-cli item create failed/);
+  assert.match(deps.logs.join("\n"), /tok3.*revoke it in the dashboard/);
 });

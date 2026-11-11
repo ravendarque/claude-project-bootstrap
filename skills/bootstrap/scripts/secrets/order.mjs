@@ -16,7 +16,7 @@ export async function storeThenSet(deps, vault, ctx, { title, fields, note, secr
     try {
       await write();
     } catch (cause) {
-      throw new Error(`Stored ${title} in Pass; not set: ${writes.slice(index).map(w => w.name).join(", ")}`, { cause });
+      throw Object.assign(new Error(`Stored ${title} in Pass; not set: ${writes.slice(index).map(w => w.name).join(", ")}`, { cause }), { stored: true });
     }
   }
   if (previous) await vault.trash(previous);

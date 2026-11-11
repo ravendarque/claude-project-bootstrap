@@ -72,19 +72,29 @@ async function run(ctx, deps, { vault, rotate }) {
       if (previous[token]) oldIds[token] = await vault.field(previous[token], "token id");
     }
     await createAll(client, deps, ctx, tokens, { accountId, zoneId });
-    for (const [index, entry] of tokens.entries()) {
-      await storeThenSet(deps, vault, ctx, {
-        title: title(entry.token),
-        fields: [
-          { name: "token", value: entry.made.value, hidden: true },
-          { name: "token id", value: entry.made.id, hidden: false },
-          { name: "expires", value: expires, hidden: false },
-        ],
-        note: `The Cloudflare ${entry.token} API token for ${ctx.repo}, set as the GitHub secret ${entry.secret}${entry.env ? ` in ${entry.env.join(" and ")}` : ""}.`,
-        secrets: secretsFor(entry, entry.made.value),
-        variables: index === 0 ? [{ name: "CLOUDFLARE_ACCOUNT_ID", value: accountId }] : [],
-        rotate,
-      });
+    let next = 0;
+    try {
+      for (const [index, entry] of tokens.entries()) {
+        next = index;
+        await storeThenSet(deps, vault, ctx, {
+          title: title(entry.token),
+          fields: [
+            { name: "token", value: entry.made.value, hidden: true },
+            { name: "token id", value: entry.made.id, hidden: false },
+            { name: "expires", value: expires, hidden: false },
+          ],
+          note: `The Cloudflare ${entry.token} API token for ${ctx.repo}, set as the GitHub secret ${entry.secret}${entry.env ? ` in ${entry.env.join(" and ")}` : ""}.`,
+          secrets: secretsFor(entry, entry.made.value),
+          variables: index === 0 ? [{ name: "CLOUDFLARE_ACCOUNT_ID", value: accountId }] : [],
+          rotate,
+        });
+      }
+    } catch (error) {
+      const unstored = tokens.slice(error.stored ? next + 1 : next);
+      for (const { made } of unstored) {
+        await client.del(`/accounts/${accountId}/tokens/${made.id}`).catch(() => deps.log(`Couldn't delete token ${made.id}: revoke it in the dashboard.`));
+      }
+      throw error;
     }
     for (const [name, id] of Object.entries(oldIds)) {
       try {

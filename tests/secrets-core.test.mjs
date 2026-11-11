@@ -236,3 +236,13 @@ test("an item left by a failed run stops a plain re-run before anything is creat
   );
   assert.ok(deps.calls.every(c => !isCall(c, "item", "create") && c.cmd !== "gh"));
 });
+
+test("only a GitHub failure marks the error as stored", async () => {
+  const ctx = loadContext(projectDir());
+  const respond = vaultResponder();
+  const github = stubDeps((cmd, args, o) => (cmd === "gh" ? { status: 1 } : respond(cmd, args, o)));
+  await assert.rejects(storeThenSet(github, newVault(github), ctx, options()), error => error.stored === true);
+  const respondPass = vaultResponder();
+  const pass = stubDeps((cmd, args, o) => (cmd === "pass-cli" && args[1] === "create" ? { status: 1 } : respondPass(cmd, args, o)));
+  await assert.rejects(storeThenSet(pass, newVault(pass), ctx, options()), error => error.stored === undefined);
+});
