@@ -41,7 +41,8 @@ the security features a private repo can't use).
 4. Ruleset (when the recorded `github_plan` is `free` on a private repo,
    skip it as the plan said and record it with `state.mjs skip`):
    `gh api -X POST repos/$R/rulesets --input .bootstrap/github/ruleset.json`.
-5. Board, copied from the private `Project template` project:
+5. Board, copied from the private `Project template` project on `<owner>`
+   (for an organisation owner, the organisation's own template):
    1. Look for an existing project titled `<name>`
       (`gh project list --owner <owner> --format json`). If one exists,
       don't copy: record its `project_number` and `project_id`, then
@@ -121,10 +122,49 @@ under that organisation.
 `gh secret list --repo $R`
 **Expected:** `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY` listed.
 
-### core:2 Create the board sync token
+### core:2 Set up board sync
 
-**Why:** the workflow token can't reach Projects v2, and a GitHub App can't
-reach a board owned by a personal account.
+**Why:** the workflow token can't reach Projects v2. A personal account's
+board needs a personal access token, because a GitHub App can't reach it.
+An organisation's board can be reached by a GitHub App, so the
+organisation gets one App for all its repositories.
+
+**Organisation owner (`owner_type` is `Organization`)**
+
+**Do:** the board-sync App must exist for the organisation. Run
+`node <skill dir>/scripts/secrets.mjs board-app <project dir>`. It does
+nothing if the App already exists, apart from checking that it's installed
+on all repositories; otherwise it opens the page to create the App, stores
+the key in Proton Pass (in a folder named after the organisation), sets the
+organisation secret and variable, and waits for the install. In the install
+page choose **All repositories**.
+
+On a private repository on GitHub Free, organisation secrets aren't
+readable, so also run
+`node <skill dir>/scripts/secrets.mjs board-app-repo <project dir>`. It
+copies the key and client id from Pass to the repository.
+
+**By hand:**
+1. Organisation → Settings → Developer settings → GitHub Apps → New GitHub
+   App.
+2. Name: `<owner>-board-sync`. Homepage URL: `https://github.com/<owner>`.
+   No webhook (untick Active).
+3. Organization permissions → Projects: Read and write. Repository
+   permissions → Issues: Read-only. Create the App.
+4. Install it on the organisation, choosing **All repositories**.
+5. Generate a private key (a `.pem` downloads) and note the client id.
+6. Run: `gh secret set BOARD_SYNC_APP_PRIVATE_KEY --org <owner> --visibility all < key.pem`
+   and `gh variable set BOARD_SYNC_APP_CLIENT_ID --org <owner> --visibility all --body <client id>`.
+7. Delete the `.pem`.
+
+**Verify (Claude runs):** `gh variable list --org <owner>` and
+`gh secret list --org <owner>`; for a private repository on GitHub Free
+also `gh variable list --repo $R` and `gh secret list --repo $R`.
+**Expected:** `BOARD_SYNC_APP_CLIENT_ID` and `BOARD_SYNC_APP_PRIVATE_KEY`
+listed at organisation level (and at repository level in the private Free
+case).
+
+**Personal owner (`owner_type` is `User`)**
 
 **Do:** run
 `node <skill dir>/scripts/secrets.mjs board-token <project dir>`. In the
@@ -161,6 +201,7 @@ also does these by hand:
 
 **Verify (Claude runs):**
 `gh api graphql -f query='query($n:Int!){ user(login:"<owner>"){ projectV2(number:$n){ workflows(first:20){ nodes{ name enabled } } } } }' -F n=<project_number> --jq '.data.user.projectV2.workflows.nodes[] | select(.enabled) | .name'`
+for a personal owner. For an organisation owner use `organization(login:"<owner>")` and `.data.organization.projectV2.workflows.nodes[]` instead; the query is otherwise the same.
 **Expected:** exactly these eight names are listed: Auto-add sub-issues to
 project, Auto-add to project, Auto-archive items, Auto-close issue, Item
 added to project, Item closed, Pull request linked to issue, Pull request

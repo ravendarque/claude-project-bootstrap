@@ -15,6 +15,7 @@ Describe the components, where each runs, and how data flows between them.
 | Secrets script → browser callback | `secrets.mjs release-app` and GitHub's App manifest redirect | A one-time manifest code, exchanged for the release App's private key | Listens on `127.0.0.1` only, on a random port; a random `state` is checked; the first valid callback closes the server; times out after an hour |
 | Secrets script → password manager CLI | `secrets.mjs` and `pass-cli` | Every credential the script makes or collects | Values go on stdin only, never as arguments or logged; the script never calls `pass-cli item update`, which takes values as arguments |
 | Secrets script → Cloudflare API | `secrets.mjs cloudflare-tokens` and `cloudflare-r2`, and a bootstrap token the user creates | A token that can create any account token | The user creates it with only Account API Tokens Write, expiring the same day; it's read from a hidden prompt and deletes itself in every outcome; each token it creates is read back and checked against the requested policies |
+| Board sync job → GitHub API | `project-status-sync.yml` in an organisation repository, and the organisation's board-sync App | A one-hour installation token (organisation Projects: write; Issues: read) | The key is an organisation secret; the token is minted per run; the App has no webhook and no repository write permission |
 
 ## Assets
 
@@ -23,6 +24,7 @@ Describe the components, where each runs, and how data flows between them.
 | Release App private key | Anyone holding it can mint tokens that push tags and, through Workflows, change workflow files |
 | Project credentials in the password manager | The source for rebuilds and rotation: the release App key, the board token, the Android upload keystore, the Cloudflare tokens and the R2 credentials |
 | Cloudflare bootstrap token | While it exists, it can create a token with any permission on the account |
+| Board-sync App private key | Anyone holding it can change every board in the organisation, and read issues in every repository |
 
 ## Actors
 
@@ -43,6 +45,7 @@ Describe the components, where each runs, and how data flows between them.
 | A secret read from the process list, a shell history or a log | Information disclosure | Secrets go to `gh` and `pass-cli` on stdin only, and to `keytool` through its own environment; tests check every external call's arguments and every log line | Mitigated |
 | Any process signed in as the user, including another Claude session, reads the vault through `pass-cli` | Information disclosure | `pass-cli item view --field` returns hidden values to any process running as the user once it's signed in. Sign out of `pass-cli` when not bootstrapping, and keep each project's credentials in its own folder | Accepted |
 | | Denial of service | | |
+| A leaked board-sync App key used to change any board in the organisation | Tampering | One App whose only write is Projects; the key is held only in the organisation secret and Pass; tokens last an hour | Accepted |
 | A leaked Cloudflare bootstrap token used to mint broad tokens | Elevation of privilege | Its only permission is Account API Tokens Write; it expires the same day; the script deletes it in every outcome and tells the user to revoke it in the dashboard if the delete fails | Mitigated |
 | Leaked release token or App key used to alter workflow files | Elevation of privilege | The Workflows permission is needed because GitHub refuses a tag whose commit's workflow files differ from the default branch's. Tokens last one hour and are minted only in the release job; the key is a repository secret; the App is installed on this repository only | Accepted |
 

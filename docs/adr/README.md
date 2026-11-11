@@ -15,3 +15,4 @@ old one's status becomes "Superseded by ADR-NNNN".
 | [0004](0004-limit-every-subagent-spawn-to-one-at-a-time.md) | Limit every subagent spawn to one at a time |
 | [0005](0005-force-sonnet-on-every-subagent-spawn.md) | Force Sonnet on every subagent spawn |
 | [0006](0006-automate-project-credentials-and-board-setup.md) | Automate project credentials and the board from a template |
+| [0007](0007-sync-organisation-boards-with-a-github-app.md) | Sync organisation boards with a GitHub App |

@@ -79,7 +79,7 @@ function harness({ beta = false, cf = fakeCloudflare(), items, skippedEnvs, pass
   const pass = vaultResponder({ items });
   const deps = stubDeps((cmd, args, options) => {
     if (fail?.(cmd, args, options)) return { status: 1, stderr: "refused" };
-    if (cmd === "pass-cli" && args[0] === "item" && args[1] === "view") return { stdout: `${passAnswers?.[args[args.indexOf("--item-id") + 1]] ?? "oldtok"}\n` };
+    if (cmd === "pass-cli" && args[0] === "item" && args[1] === "view") return { stdout: `${passAnswers?.[args.find(arg => arg.startsWith("--item-id=")).slice("--item-id=".length)] ?? "oldtok"}\n` };
     return pass(cmd, args, options);
   });
   deps.fetch = cf.fetch;

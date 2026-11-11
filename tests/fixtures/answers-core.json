@@ -1,1 +1,1 @@
-{ "name": "Sample Project", "description": "A sample project for tests.", "owner": "sample-owner", "visibility": "public", "merge_policy": "claude" }
+{ "name": "Sample Project", "description": "A sample project for tests.", "owner": "sample-owner", "owner_type": "User", "visibility": "public", "merge_policy": "claude" }

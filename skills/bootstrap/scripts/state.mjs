@@ -44,11 +44,14 @@ function isApplicationId(value) {
 
 const GITHUB_PLANS = ["free", "pro", "team", "enterprise"];
 
+const OWNER_TYPES = ["User", "Organization"];
+
 function checkQuestions(input, manifests) {
   if (!["public", "private"].includes(input.visibility)) throw new Error("visibility must be public or private");
   if (input.visibility === "private" && !GITHUB_PLANS.includes(input.github_plan)) {
     throw new Error(`github_plan must be one of ${GITHUB_PLANS.join(", ")} for a private repository`);
   }
+  if (!OWNER_TYPES.includes(input.owner_type)) throw new Error(`owner_type must be one of ${OWNER_TYPES.join(", ")}`);
   for (const { key, type } of manifests.flatMap(m => m.questions ?? [])) {
     const value = input[key];
     if (type === "boolean") {

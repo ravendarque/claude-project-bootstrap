@@ -9,7 +9,7 @@ import { Vault } from "./secrets/vault.mjs";
 
 export { storeThenSet };
 
-export const STEP_NAMES = ["release-app", "board-token", "android-keystore", "cloudflare-tokens", "cloudflare-r2"];
+export const STEP_NAMES = ["release-app", "board-app", "board-app-repo", "board-token", "android-keystore", "cloudflare-tokens", "cloudflare-r2"];
 
 const USAGE = `Usage: secrets.mjs <step> <project dir> [--vault <name>] [--rotate]
 Steps: ${STEP_NAMES.join(", ")}`;
@@ -60,11 +60,12 @@ export async function runCli(argv, deps, { steps } = {}) {
   try {
     const ctx = loadContext(dir);
     await preflight(deps, step);
-    if (!parsed.values.rotate && (await secretsExist(deps, ctx, step.secrets(ctx)))) {
+    const existing = step.secrets(ctx);
+    if (!parsed.values.rotate && existing.length && (await secretsExist(deps, ctx, existing))) {
       deps.log(`The ${name} secrets already exist. Nothing to do: re-run with --rotate to replace them.`);
       return 0;
     }
-    const vault = new Vault(deps, { vault: parsed.values.vault, folder: ctx.slug });
+    const vault = new Vault(deps, { vault: parsed.values.vault, folder: step.folder?.(ctx) ?? ctx.slug });
     await step.run(ctx, deps, { vault, rotate: parsed.values.rotate });
     return 0;
   } catch (error) {

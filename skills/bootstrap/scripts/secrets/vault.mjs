@@ -76,19 +76,19 @@ export class Vault {
       ],
       extra_fields: [],
     };
-    await pass(this.deps, ["item", "create", "custom", "--from-template", "-", "--vault-name", this.vault, "--folder-id", folderId], JSON.stringify(template));
+    await pass(this.deps, ["item", "create", "custom", "--from-template", "-", "--vault-name", this.vault, `--folder-id=${folderId}`], JSON.stringify(template));
     const created = (await this.#activeIds(title, { refresh: true })).filter(id => !before.has(id));
     if (created.length !== 1) throw new Error(`Created ${title} in Pass but could not identify the new item: check folder ${this.folder} in vault ${this.vault}`);
     return created[0];
   }
 
   async field(itemId, name) {
-    const out = await pass(this.deps, ["item", "view", "--vault-name", this.vault, "--item-id", itemId, "--field", name]);
+    const out = await pass(this.deps, ["item", "view", "--vault-name", this.vault, `--item-id=${itemId}`, "--field", name]);
     return out.trim();
   }
 
   async trash(itemId) {
-    await pass(this.deps, ["item", "trash", "--vault-name", this.vault, "--item-id", itemId]);
+    await pass(this.deps, ["item", "trash", "--vault-name", this.vault, `--item-id=${itemId}`]);
     this.#items = null;
   }
 }

@@ -29,6 +29,8 @@ the render, and nothing is written.
 Derived keys: `slug`, `required_checks_json`, `claude_index`,
 `coding_standards_modules`, `screening_table`, `release_paths_json`,
 `repo_url`, `claude_stack_section`, `allow_builds_yaml`. Answers also gain `private`,
+`owner_org` (true when the `owner_type` answer is `Organization`; `owner_type` itself is `User` or
+`Organization`, and a file's `when` can use `owner_org`),
 `licensor` (defaulted), and escaped forms of the name for code and markup:
 `name_js`, `greeting_js`, `name_html`, `description_toml`; and
 `python_package`, the slug as a Python identifier (`-` becomes `_`, and a

@@ -100,6 +100,7 @@ export function validateAnswers(input, { maxSlugLength: limit = 63 } = {}) {
     name,
     slug,
     private: input.visibility === "private",
+    owner_org: input.owner_type === "Organization",
     name_js: JSON.stringify(name),
     name_html: escapeHtml(name),
     greeting_js: JSON.stringify(`Hello from ${name}`),

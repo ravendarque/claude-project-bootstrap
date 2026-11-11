@@ -83,12 +83,21 @@ steps count as settled. If the saved answers lack one the interview now asks
    directory, not inside another git work tree. Report the reason and stop
    otherwise.
 2. **`interview`**: ask in plain chat for:
-   - project name, one-line description, GitHub owner (a personal account
-     in v1), visibility (public or private);
+   - project name, one-line description, GitHub owner (default
+     `oneloneraven`), visibility (public or private);
+   - the owner's type (`owner_type`): record it from
+     `gh api users/<owner> --jq .type`, which prints `User` or
+     `Organization`. For an organisation, check that `gh auth status` lists
+     the `admin:org` scope, because the board-sync App's organisation
+     secret and variable need it. If it's missing, ask the user to run
+     `gh auth refresh -h github.com -s admin:org`;
    - for a private repo only, the owner's GitHub plan (`github_plan`: `free`,
      `pro`, `team` or `enterprise`). First try
-     `gh api user --jq '.plan.name // empty'`: the API returns `plan` only to
-     a token with the `user` scope, so a typical token prints nothing. If it
+     `gh api user --jq '.plan.name // empty'` for a personal owner, or
+     `gh api orgs/<owner> --jq '.plan.name // empty'` for an organisation
+     owner. The user endpoint returns `plan` only to a token with the `user`
+     scope, and the organisation endpoint only to an organisation admin, so
+     the command may print nothing. If it
      prints a plan, record it lower-cased. If it prints nothing, say the token
      can't read the plan and ask which plan the owner is on. Public repos get
      these features on every plan: don't ask and record no plan;
@@ -136,6 +145,9 @@ steps count as settled. If the saved answers lack one the interview now asks
      rather than assumes. It creates them and verifies their branch policies,
      and only if that check fails does the module fall back to repository-level
      secrets;
+   - for an organisation owner with a private repo on `free`, say the
+     board-sync key is also set on the repository, because organisation
+     secrets aren't readable by private repositories on Free;
    - every manual step ahead, and its cost (usually nothing). Say plainly
      that there's nothing to do for them yet: you'll walk the user through
      each one, one at a time, after the GitHub configuration;

@@ -54,7 +54,7 @@ test("recordId stores a created resource id and getId reads it back", () => {
 
 test("saveAnswers validates, saves the run and writes answers.json", () => {
   const dir = tmp();
-  const { slug } = saveAnswers(dir, { name: "My App", owner: "o", visibility: "public", merge_policy: "claude" }, ["js-toolchain"], realModulesDir);
+  const { slug } = saveAnswers(dir, { owner_type: "User", name: "My App", owner: "o", visibility: "public", merge_policy: "claude" }, ["js-toolchain"], realModulesDir);
   assert.equal(slug, "my-app");
   const state = loadState(dir);
   assert.deepEqual(state.modules, ["js-toolchain"]);
@@ -64,7 +64,7 @@ test("saveAnswers validates, saves the run and writes answers.json", () => {
 
 test("saveAnswers applies the selected modules' slug limit", () => {
   assert.throws(
-    () => saveAnswers(tmp(), { name: "x".repeat(45), visibility: "public", beta: false, zone_name: "example.com", merge_policy: "claude" }, ["cloudflare-opentofu"], realModulesDir),
+    () => saveAnswers(tmp(), { owner_type: "User", name: "x".repeat(45), visibility: "public", beta: false, zone_name: "example.com", merge_policy: "claude" }, ["cloudflare-opentofu"], realModulesDir),
     /allow at most 40/,
   );
 });
@@ -77,7 +77,7 @@ test("state writes leave no partial file behind", () => {
 
 test("saveAnswers requires visibility to be public or private", () => {
   for (const visibility of [undefined, "Private", "internal"]) {
-    assert.throws(() => saveAnswers(tmp(), { name: "A", visibility }, [], realModulesDir), {
+    assert.throws(() => saveAnswers(tmp(), { owner_type: "User", name: "A", visibility }, [], realModulesDir), {
       message: "visibility must be public or private",
     });
   }
@@ -85,53 +85,53 @@ test("saveAnswers requires visibility to be public or private", () => {
 
 test("saveAnswers requires a known github_plan for a private repository only", () => {
   for (const github_plan of [undefined, "", "Free", "paid"]) {
-    assert.throws(() => saveAnswers(tmp(), { name: "A", visibility: "private", github_plan }, [], realModulesDir), {
+    assert.throws(() => saveAnswers(tmp(), { owner_type: "User", name: "A", visibility: "private", github_plan }, [], realModulesDir), {
       message: "github_plan must be one of free, pro, team, enterprise for a private repository",
     });
   }
   for (const github_plan of ["free", "pro", "team", "enterprise"]) {
     const dir = tmp();
-    saveAnswers(dir, { name: "A", visibility: "private", github_plan, merge_policy: "claude" }, [], realModulesDir);
+    saveAnswers(dir, { owner_type: "User", name: "A", visibility: "private", github_plan, merge_policy: "claude" }, [], realModulesDir);
     assert.equal(loadState(dir).answers.github_plan, github_plan);
   }
-  saveAnswers(tmp(), { name: "A", visibility: "public", merge_policy: "claude" }, [], realModulesDir);
+  saveAnswers(tmp(), { owner_type: "User", name: "A", visibility: "public", merge_policy: "claude" }, [], realModulesDir);
 });
 
 test("saveAnswers requires a known merge_policy, checked after the module questions", () => {
   for (const merge_policy of [undefined, "", "Claude", "auto"]) {
-    assert.throws(() => saveAnswers(tmp(), { name: "A", visibility: "public", merge_policy }, [], realModulesDir), {
+    assert.throws(() => saveAnswers(tmp(), { owner_type: "User", name: "A", visibility: "public", merge_policy }, [], realModulesDir), {
       message: "merge_policy must be one of claude, claude-except-release, maintainer",
     });
   }
-  assert.throws(() => saveAnswers(tmp(), { name: "A", visibility: "public" }, ["android-toolchain"], realModulesDir), {
+  assert.throws(() => saveAnswers(tmp(), { owner_type: "User", name: "A", visibility: "public" }, ["android-toolchain"], realModulesDir), {
     message: "application_id is required",
   });
   for (const merge_policy of ["claude", "claude-except-release", "maintainer"]) {
     const dir = tmp();
-    saveAnswers(dir, { name: "A", visibility: "public", merge_policy }, [], realModulesDir);
+    saveAnswers(dir, { owner_type: "User", name: "A", visibility: "public", merge_policy }, [], realModulesDir);
     assert.equal(loadState(dir).answers.merge_policy, merge_policy);
   }
 });
 
 test("saveAnswers checks each selected module's questions by type", () => {
-  const base = { name: "A", visibility: "public", zone_name: "example.com" };
+  const base = { owner_type: "User", name: "A", visibility: "public", zone_name: "example.com" };
   assert.throws(() => saveAnswers(tmp(), { ...base, beta: "no" }, ["cloudflare-opentofu"], realModulesDir), {
     message: "beta must be true or false",
   });
-  assert.throws(() => saveAnswers(tmp(), { name: "A", visibility: "public", beta: true }, ["cloudflare-opentofu"], realModulesDir), {
+  assert.throws(() => saveAnswers(tmp(), { owner_type: "User", name: "A", visibility: "public", beta: true }, ["cloudflare-opentofu"], realModulesDir), {
     message: "zone_name is required",
   });
 });
 
 test("saveAnswers rejects a zone that isn't a hostname", () => {
   assert.throws(
-    () => saveAnswers(tmp(), { name: "A", visibility: "public", beta: false, zone_name: 'ex"ample.com' }, ["cloudflare-opentofu"], realModulesDir),
+    () => saveAnswers(tmp(), { owner_type: "User", name: "A", visibility: "public", beta: false, zone_name: 'ex"ample.com' }, ["cloudflare-opentofu"], realModulesDir),
     { message: "zone_name must be a domain name such as example.com" },
   );
 });
 
 test("saveAnswers checks an Android application id", () => {
-  const base = { name: "A", visibility: "public" };
+  const base = { owner_type: "User", name: "A", visibility: "public" };
   for (const bad of ["app", "Org.example.app", "org.example.", "org.1example.app", "org.example.new", "org.fun.app", "org-example.app"]) {
     assert.throws(() => saveAnswers(tmp(), { ...base, application_id: bad }, ["android-toolchain"], realModulesDir), {
       message: "application_id must be a lower-case reverse domain such as org.example.app, with no Java or Kotlin keyword as a segment",
@@ -223,4 +223,15 @@ test("the skip command reports a done step as a plain error and exits 1", () => 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /already done/);
   assert.doesNotMatch(result.stderr, /\n\s+at /);
+});
+
+test("saveAnswers requires owner_type to be User or Organization", () => {
+  for (const owner_type of [undefined, "", "user", "Team"]) {
+    assert.throws(() => saveAnswers(tmp(), { owner_type, name: "A", visibility: "public", merge_policy: "claude" }, [], realModulesDir), {
+      message: "owner_type must be one of User, Organization",
+    });
+  }
+  const dir = tmp();
+  saveAnswers(dir, { owner_type: "Organization", name: "A", visibility: "public", merge_policy: "claude" }, [], realModulesDir);
+  assert.equal(loadState(dir).answers.owner_type, "Organization");
 });

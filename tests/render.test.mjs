@@ -218,6 +218,8 @@ test("maxSlugLength takes the minimum over modules", () => {
 test("validateAnswers derives private, licensor and escaped name keys", () => {
   const { answers } = validateAnswers({ name: `Sam's "App" <1>`, visibility: "private" });
   assert.equal(answers.private, true);
+  assert.equal(answers.owner_org, false);
+  assert.equal(validateAnswers({ name: "A", visibility: "public", owner_type: "Organization" }).answers.owner_org, true);
   assert.equal(answers.licensor, "Ravendarque (https://github.com/ravendarque)");
   assert.equal(answers.name_js, JSON.stringify(`Sam's "App" <1>`));
   assert.equal(answers.greeting_js, JSON.stringify(`Hello from Sam's "App" <1>`));

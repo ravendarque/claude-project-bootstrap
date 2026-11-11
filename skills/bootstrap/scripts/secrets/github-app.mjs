@@ -5,15 +5,14 @@ const API = "https://api.github.com";
 const API_HEADERS = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
 const HOUR_MS = 60 * 60 * 1000;
 
-export function buildManifest(ctx, redirectUrl) {
-  const url = `https://github.com/${ctx.repo}`;
+export function buildManifest({ name, url, permissions }, redirectUrl) {
   return {
-    name: `${ctx.slug}-release`,
+    name,
     url,
     hook_attributes: { url, active: false },
     redirect_url: redirectUrl,
     public: false,
-    default_permissions: { contents: "write", workflows: "write" },
+    default_permissions: permissions,
   };
 }
 
@@ -27,6 +26,11 @@ export function appJwt(clientId, pem, now) {
 }
 
 const escapeHtml = text => text.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
+
+export function appSettingsUrl(type, owner, slug) {
+  const settings = type === "Organization" ? `organizations/${encodeURIComponent(owner)}/settings` : "settings";
+  return `https://github.com/${settings}/apps/${encodeURIComponent(slug)}`;
+}
 
 export function newAppUrl(type, owner, state) {
   const settings = type === "Organization" ? `organizations/${encodeURIComponent(owner)}/settings` : "settings";
@@ -105,19 +109,33 @@ async function api(deps, path, token, init = {}) {
   return response.json();
 }
 
+export async function fetchApp(deps, { clientId, pem }) {
+  const response = await deps.fetch(`${API}/app`, { headers: { ...API_HEADERS, Authorization: `Bearer ${appJwt(clientId, pem, deps.now())}` } });
+  return { ok: response.ok, status: response.status };
+}
+
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function verifyInstallation(deps, ctx, { clientId, pem }, { intervalMs = 5000, limitMs = 10 * 60 * 1000 } = {}) {
+export async function awaitInstallation(deps, owner, { clientId, pem }, { intervalMs = 5000, limitMs = 10 * 60 * 1000, notInstalledHint } = {}) {
   const attempts = Math.max(1, Math.ceil(limitMs / intervalMs));
   let installation;
   for (let attempt = 0; attempt < attempts && !installation; attempt++) {
     if (attempt) await sleep(intervalMs);
     const jwt = appJwt(clientId, pem, deps.now());
     const all = await api(deps, "/app/installations", jwt);
-    installation = all.find(entry => entry.account?.login?.toLowerCase() === ctx.owner.toLowerCase());
+    installation = all.find(entry => entry.account?.login?.toLowerCase() === owner.toLowerCase());
   }
-  if (!installation) throw new Error(`The App wasn't installed within ${Math.round(limitMs / 60000)} minutes: install it on ${ctx.repo} only, then set the secrets by hand (core:1 "By hand")`);
-  const { token } = await api(deps, `/app/installations/${installation.id}/access_tokens`, appJwt(clientId, pem, deps.now()), { method: "POST" });
+  if (!installation) throw new Error(`The App wasn't installed within ${Math.round(limitMs / 60000)} minutes: ${notInstalledHint}`);
+  return installation;
+}
+
+export async function verifyInstallation(deps, ctx, app, { intervalMs, limitMs } = {}) {
+  const installation = await awaitInstallation(deps, ctx.owner, app, {
+    intervalMs,
+    limitMs,
+    notInstalledHint: `install it on ${ctx.repo} only, then set the secrets by hand (core:1 "By hand")`,
+  });
+  const { token } = await api(deps, `/app/installations/${installation.id}/access_tokens`, appJwt(app.clientId, app.pem, deps.now()), { method: "POST" });
   const { repositories } = await api(deps, "/installation/repositories", token);
   const names = repositories.map(repo => repo.full_name);
   if (names.length !== 1 || names[0] !== ctx.repo) {

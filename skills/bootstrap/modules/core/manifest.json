@@ -142,8 +142,14 @@
       "when": "!private"
     },
     {
-      "from": "templates/github/workflows/project-status-sync.yml",
-      "to": ".github/workflows/project-status-sync.yml"
+      "from": "templates/github/workflows/project-status-sync-pat.yml",
+      "to": ".github/workflows/project-status-sync.yml",
+      "when": "!owner_org"
+    },
+    {
+      "from": "templates/github/workflows/project-status-sync-app.yml",
+      "to": ".github/workflows/project-status-sync.yml",
+      "when": "owner_org"
     },
     {
       "from": "templates/github/scripts/plan-releases.mjs",

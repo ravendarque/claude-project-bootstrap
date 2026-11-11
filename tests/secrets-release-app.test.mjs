@@ -5,7 +5,7 @@ import { loadContext } from "../skills/bootstrap/scripts/secrets/context.mjs";
 import { Vault } from "../skills/bootstrap/scripts/secrets/vault.mjs";
 import releaseApp, { appJwt, buildManifest, newAppUrl, ownerType, waitForCallback } from "../skills/bootstrap/scripts/secrets/steps/release-app.mjs";
 import { runCli } from "../skills/bootstrap/scripts/secrets.mjs";
-import { projectDir, stubDeps, vaultResponder } from "./helpers-secrets.mjs";
+import { folder, projectDir, stubDeps, vaultResponder } from "./helpers-secrets.mjs";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -16,7 +16,7 @@ const ctx = () => loadContext(projectDir());
 const json = body => ({ ok: true, status: 200, json: async () => body });
 
 test("buildManifest asks for contents and workflows write only", () => {
-  const manifest = buildManifest(ctx(), "http://127.0.0.1:1/callback");
+  const manifest = buildManifest({ name: "sample-project-release", url: "https://github.com/sample-owner/sample-project", permissions: { contents: "write", workflows: "write" } }, "http://127.0.0.1:1/callback");
   assert.deepEqual(manifest.default_permissions, { contents: "write", workflows: "write" });
   assert.equal(manifest.public, false);
   assert.equal(manifest.hook_attributes.active, false);
@@ -58,9 +58,17 @@ test("callback times out with a clear error", async () => {
   await assert.rejects(waitForCallback(stubDeps(), "s", { manifestFor: () => ({}), timeoutMs: 20 }), /Timed out/);
 });
 
-function stepHarness({ repos = ["sample-owner/sample-project"], installed = true, ownerKind = "User" } = {}) {
+function stepHarness({ repos = ["sample-owner/sample-project"], installed = true, ownerKind = "User", items = [], folders = [], appUrl = "https://github.com/apps/sample-project-release", appExists = true } = {}) {
   const pem = privateKey;
-  const respond = vaultResponder();
+  const vaultFake = vaultResponder({ items, folders });
+  const respond = (cmd, args, options) => {
+    if (cmd === "pass-cli" && args[0] === "item" && args[1] === "view") {
+      const field = args[args.indexOf("--field") + 1];
+      if (field === "App URL" && !appUrl) return { status: 1, stderr: "no such field" };
+      return { stdout: { "client id": "Iv1.old", "private key": privateKey, "App URL": appUrl }[field] };
+    }
+    return vaultFake(cmd, args, options);
+  };
   const fetched = [];
   const pages = [];
   const deps = stubDeps(respond);
@@ -69,6 +77,7 @@ function stepHarness({ repos = ["sample-owner/sample-project"], installed = true
     fetched.push({ url, init });
     if (url.endsWith("/users/sample-owner")) return json({ type: ownerKind });
     if (url.endsWith("/conversions")) return json({ id: 7, client_id: "Iv1.abc", pem, html_url: "https://github.com/apps/sample-project-release", slug: "sample-project-release", client_secret: "cs", webhook_secret: "ws" });
+    if (url.endsWith("/app")) return appExists ? json({ slug: "sample-project-release" }) : { ok: false, status: 404, json: async () => ({}) };
     if (url.endsWith("/app/installations")) return json(installed ? [{ id: 99, account: { login: "sample-owner" } }] : []);
     if (url.endsWith("/access_tokens")) return json({ token: "inst-token" });
     if (url.endsWith("/installation/repositories")) return json({ repositories: repos.map(full_name => ({ full_name })) });
@@ -98,7 +107,7 @@ test("release-app stores the PEM before setting the secret, and never passes it 
   for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")), "no argument carries the PEM");
   const create = deps.calls.find(call => call.args[1] === "create" && call.args[0] === "item");
   const fields = JSON.parse(create.input).sections[0].fields;
-  assert.deepEqual(fields.map(f => [f.field_name, f.field_type]), [["App id", "text"], ["client id", "text"], ["private key", "hidden"]]);
+  assert.deepEqual(fields.map(f => [f.field_name, f.field_type]), [["App id", "text"], ["client id", "text"], ["private key", "hidden"], ["App URL", "text"]]);
   assert.equal(deps.calls.find(call => call.args[0] === "secret").input, pem);
   assert.equal(deps.calls.find(call => call.args[0] === "variable").input, "Iv1.abc");
   const conversion = fetched.find(f => f.url.endsWith("/conversions"));
@@ -180,4 +189,63 @@ test("release-app creates the App under the organisation when the owner is one",
   await releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 });
   await done();
   assert.match(pages[0], /action="https:\/\/github\.com\/organizations\/sample-owner\/settings\/apps\/new\?state=[0-9a-f]+"/);
+});
+
+test("release-app tells you how to recover when Pass fails after the App was created", async () => {
+  const c = ctx();
+  const { deps, done } = stepHarness();
+  const base = deps.exec;
+  deps.exec = async (cmd, args, options) => (cmd === "pass-cli" && args[0] === "item" && args[1] === "create" ? { status: 1, stderr: "pass is down" } : base(cmd, args, options));
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await assert.rejects(releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 }), error => {
+    assert.match(error.message, /The App sample-project-release exists on GitHub but its key wasn't stored \(.*pass is down.*\)\. Delete it at https:\/\/github\.com\/settings\/apps\/sample-project-release\/advanced, then re-run this step\./);
+    assert.ok(error.cause);
+    return true;
+  });
+  await done();
+  assert.ok(!deps.calls.some(call => call.args[0] === "secret"));
+  for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")), "no argument carries the PEM");
+  assert.ok(!deps.logs.join("\n").includes("PRIVATE KEY"));
+});
+
+const earlierRelease = { items: [{ id: "i1", title: "release App", folder_id: "f1" }], folders: [folder("f1", "sample-project")] };
+
+test("release-app resumes from an earlier Pass item instead of creating a second App", async () => {
+  const c = ctx();
+  const { deps, fetched } = stepHarness(earlierRelease);
+  const opened = [];
+  const base = deps.openUrl;
+  deps.openUrl = url => (opened.push(url), base(url));
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 });
+  assert.match(deps.logs.join("\n"), /Resuming: the release App already exists in Pass/);
+  assert.ok(!opened.some(url => url.startsWith("http://127.0.0.1")), "no manifest callback");
+  assert.ok(!fetched.some(f => f.url.endsWith("/conversions")));
+  assert.ok(!deps.calls.some(call => call.args[0] === "item" && call.args[1] === "create"));
+  const secret = deps.calls.find(call => call.args[0] === "secret");
+  assert.deepEqual(secret.args, ["secret", "set", "RELEASE_APP_PRIVATE_KEY", "--repo", "sample-owner/sample-project"]);
+  assert.equal(secret.input, privateKey.trim());
+  const variable = deps.calls.find(call => call.args[0] === "variable");
+  assert.equal(variable.input, "Iv1.old");
+  assert.ok(opened.includes("https://github.com/apps/sample-project-release/installations/new"));
+  assert.match(deps.logs.join("\n"), /installed on sample-owner\/sample-project only/);
+  for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")));
+});
+
+test("release-app resume without an App URL sets the values and says how to check the installation", async () => {
+  const c = ctx();
+  const { deps, fetched } = stepHarness({ ...earlierRelease, appUrl: "" });
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 });
+  assert.ok(deps.calls.some(call => call.args[0] === "secret" && call.args[1] === "set"));
+  assert.ok(!fetched.some(f => f.url.endsWith("/app/installations")));
+  assert.match(deps.logs.join("\n"), /no App URL.*Only select repositories/);
+});
+
+test("release-app resume stops when the App in Pass no longer exists on GitHub", async () => {
+  const c = ctx();
+  const { deps } = stepHarness({ ...earlierRelease, appExists: false });
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await assert.rejects(releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 }), /The release App in Pass no longer exists on GitHub \(HTTP 404\)/);
+  assert.ok(!deps.calls.some(call => call.args[0] === "secret" || call.args[0] === "variable"));
 });

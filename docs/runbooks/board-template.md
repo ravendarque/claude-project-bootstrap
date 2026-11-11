@@ -78,6 +78,16 @@ The API reports which workflows are enabled, but not their settings.
 4. Delete the throwaway project once its title and its 0 items are
    confirmed.
 
+## Where the templates are
+
+- **`oneloneraven` (organisation), project 1:** the template for
+  organisation-owned projects. It was copied from the personal template on
+  2026-11-11, and the copy matched every field, view, sort and enabled
+  workflow.
+- **The personal account, project 9:** the template for personal-owner
+  bootstraps. It stays until the migration to the organisation (#75) is
+  finished, and is deleted after that.
+
 Last checked on 2026-11-08: a copy kept every field, view, sort and
 workflow, including Auto-archive. It had no Auto-add, and listed Epics
 before No parent epic.
