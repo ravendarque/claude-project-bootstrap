@@ -58,7 +58,7 @@ test("callback times out with a clear error", async () => {
   await assert.rejects(waitForCallback(stubDeps(), "s", { manifestFor: () => ({}), timeoutMs: 20 }), /Timed out/);
 });
 
-function stepHarness({ repos = ["sample-owner/sample-project"], installed = true, ownerKind = "User", items = [], folders = [], appUrl = "https://github.com/apps/sample-project-release" } = {}) {
+function stepHarness({ repos = ["sample-owner/sample-project"], installed = true, ownerKind = "User", items = [], folders = [], appUrl = "https://github.com/apps/sample-project-release", appExists = true } = {}) {
   const pem = privateKey;
   const vaultFake = vaultResponder({ items, folders });
   const respond = (cmd, args, options) => {
@@ -77,6 +77,7 @@ function stepHarness({ repos = ["sample-owner/sample-project"], installed = true
     fetched.push({ url, init });
     if (url.endsWith("/users/sample-owner")) return json({ type: ownerKind });
     if (url.endsWith("/conversions")) return json({ id: 7, client_id: "Iv1.abc", pem, html_url: "https://github.com/apps/sample-project-release", slug: "sample-project-release", client_secret: "cs", webhook_secret: "ws" });
+    if (url.endsWith("/app")) return appExists ? json({ slug: "sample-project-release" }) : { ok: false, status: 404, json: async () => ({}) };
     if (url.endsWith("/app/installations")) return json(installed ? [{ id: 99, account: { login: "sample-owner" } }] : []);
     if (url.endsWith("/access_tokens")) return json({ token: "inst-token" });
     if (url.endsWith("/installation/repositories")) return json({ repositories: repos.map(full_name => ({ full_name })) });
@@ -239,4 +240,12 @@ test("release-app resume without an App URL sets the values and says how to chec
   assert.ok(deps.calls.some(call => call.args[0] === "secret" && call.args[1] === "set"));
   assert.ok(!fetched.some(f => f.url.endsWith("/app/installations")));
   assert.match(deps.logs.join("\n"), /no App URL.*Only select repositories/);
+});
+
+test("release-app resume stops when the App in Pass no longer exists on GitHub", async () => {
+  const c = ctx();
+  const { deps } = stepHarness({ ...earlierRelease, appExists: false });
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await assert.rejects(releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 }), /The release App in Pass no longer exists on GitHub \(HTTP 404\)/);
+  assert.ok(!deps.calls.some(call => call.args[0] === "secret" || call.args[0] === "variable"));
 });

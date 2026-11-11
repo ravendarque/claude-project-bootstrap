@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { appSettingsUrl, buildManifest, convertManifest, newAppUrl, ownerType, verifyInstallation, waitForCallback } from "../github-app.mjs";
+import { appSettingsUrl, buildManifest, convertManifest, fetchApp, newAppUrl, ownerType, verifyInstallation, waitForCallback } from "../github-app.mjs";
 import { setSecret, setVariable } from "../github.mjs";
 import { storeAppThenSet } from "../order.mjs";
 
@@ -14,6 +14,8 @@ async function resume(ctx, deps, vault, itemId, options) {
   const clientId = await vault.field(itemId, "client id");
   const pem = await vault.field(itemId, "private key");
   const htmlUrl = await vault.field(itemId, "App URL").catch(() => "");
+  const existing = await fetchApp(deps, { clientId, pem });
+  if (!existing.ok) throw new Error(`The release App in Pass no longer exists on GitHub (HTTP ${existing.status}): move the Pass item to the bin, then re-run`);
   await setSecret(deps, ctx.repo, SECRET, pem);
   await setVariable(deps, ctx.repo, VARIABLE, clientId);
   if (!htmlUrl) {
