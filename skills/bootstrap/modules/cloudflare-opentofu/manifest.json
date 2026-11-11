@@ -71,6 +71,16 @@
       "to": "infra/terraform.tfvars.example"
     },
     {
+      "from": "templates/bootstrap/cloudflare-tokens.json",
+      "to": ".bootstrap/cloudflare/tokens.json",
+      "when": "!beta"
+    },
+    {
+      "from": "templates/bootstrap/cloudflare-tokens-beta.json",
+      "to": ".bootstrap/cloudflare/tokens.json",
+      "when": "beta"
+    },
+    {
       "from": "templates/infra/README.md",
       "to": "infra/README.md"
     },

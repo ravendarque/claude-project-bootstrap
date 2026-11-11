@@ -153,3 +153,39 @@ test("plan-dependent steps use the recorded github_plan", () => {
   assert.match(coreDoc, /recorded `github_plan` is `free`/);
   assert.match(moduleDoc, /recorded `github_plan` is `free`/);
 });
+
+const tokensIn = dir => JSON.parse(read(dir, ".bootstrap/cloudflare/tokens.json"));
+const normalise = names => names.map(name => name.replace(/\bEdit$/, "Write")).sort();
+
+function readmeTokens(dir, beta) {
+  const section = read(dir, "infra/README.md").split("### Cloudflare API tokens")[1].split("###")[0];
+  return section.split("\n").filter(line => /^\| (Preview|Deploy|Infra plan|Infra apply) \|/.test(line)).map(line => {
+    const [, token, secret, permissions] = line.split("|").map(cell => cell.trim());
+    const [name, scope] = secret.match(/^`([A-Z_]+)` \((.*)\)$/).slice(1);
+    const env = scope === "repository" ? null : [...scope.matchAll(/`([a-z]+)`/g)].map(m => m[1]).filter(e => beta || e !== "beta");
+    const names = permissions.replace(/(Account|Zone): /g, "").split(/[,.]\s*/).map(s => s.trim()).filter(Boolean);
+    return { token, secret: name, env, permissions: normalise(names) };
+  });
+}
+
+for (const [label, dir, beta] of [["with beta", withBeta, true], ["without beta", noBeta, false]]) {
+  test(`every rendered token entry matches the README table ${label}`, () => {
+    const rendered = tokensIn(dir).map(({ token, secret, env, permissions }) => ({ token, secret, env, permissions: normalise(permissions) }));
+    assert.deepEqual(rendered, readmeTokens(dir, beta));
+  });
+}
+
+test("the deploy token's environments follow the beta answer", () => {
+  assert.deepEqual(tokensIn(withBeta).find(t => t.token === "Deploy").env, ["production", "beta"]);
+  assert.deepEqual(tokensIn(noBeta).find(t => t.token === "Deploy").env, ["production"]);
+});
+
+test("the README lists the infra plan token's permissions explicitly", () => {
+  const plan = readmeTokens(withBeta, true).find(t => t.token === "Infra plan");
+  assert.deepEqual(plan.permissions, normalise(["Workers R2 Storage Read", "Transform Rules Read", "DNS Read", "Zone Settings Read", "Zone WAF Read", "Cache Settings Read"]));
+  assert.doesNotMatch(read(withBeta, "infra/README.md"), /read-only version of each/);
+});
+
+test("the README says Transform Rules covers every zone in the account", () => {
+  assert.match(read(withBeta, "infra/README.md"), /Transform Rules.*account-scoped.*every zone in the account/s);
+});

@@ -1,0 +1,52 @@
+[
+  {
+    "token": "Preview",
+    "secret": "CLOUDFLARE_PREVIEW_TOKEN",
+    "env": null,
+    "permissions": [
+      "Workers Scripts Write",
+      "Account Settings Read"
+    ]
+  },
+  {
+    "token": "Deploy",
+    "secret": "CLOUDFLARE_DEPLOY_TOKEN",
+    "env": [
+      "production",
+      "beta"
+    ],
+    "permissions": [
+      "Workers Scripts Write",
+      "Account Settings Read",
+      "Workers Routes Write"
+    ]
+  },
+  {
+    "token": "Infra plan",
+    "secret": "CLOUDFLARE_INFRA_PLAN_TOKEN",
+    "env": null,
+    "permissions": [
+      "Workers R2 Storage Read",
+      "Transform Rules Read",
+      "DNS Read",
+      "Zone Settings Read",
+      "Zone WAF Read",
+      "Cache Settings Read"
+    ]
+  },
+  {
+    "token": "Infra apply",
+    "secret": "CLOUDFLARE_INFRA_APPLY_TOKEN",
+    "env": [
+      "infra"
+    ],
+    "permissions": [
+      "Workers R2 Storage Write",
+      "Transform Rules Write",
+      "DNS Write",
+      "Zone Settings Write",
+      "Zone WAF Write",
+      "Cache Settings Write"
+    ]
+  }
+]

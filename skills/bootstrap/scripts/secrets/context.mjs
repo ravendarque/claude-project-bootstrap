@@ -8,6 +8,7 @@ export function loadContext(dir) {
   }
   const { owner, slug, name, zone_name: zoneName } = answers;
   return {
+    dir,
     owner,
     slug,
     name,

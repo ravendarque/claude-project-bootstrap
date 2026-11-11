@@ -74,6 +74,11 @@ export class Vault {
     return created[0];
   }
 
+  async field(itemId, name) {
+    const out = await pass(this.deps, ["item", "view", "--vault-name", this.vault, "--item-id", itemId, "--field", name]);
+    return out.trim();
+  }
+
   async trash(itemId) {
     await pass(this.deps, ["item", "trash", "--vault-name", this.vault, "--item-id", itemId]);
   }

@@ -143,7 +143,17 @@ same steps for later rebuilds.
 **Why:** CI needs separate least-privilege credentials for previews,
 deploys, and the infrastructure plan and apply.
 
-**Do:** In the Cloudflare dashboard → My Profile → API Tokens (or Manage
+**Do:** make the bootstrap token: Cloudflare dashboard → Manage Account →
+Account API Tokens → Create Token → Custom token. Its only permission is
+Account: Account API Tokens: Edit, and it expires today. Then run
+`node <skill dir>/scripts/secrets.mjs cloudflare-tokens <project dir>`.
+Paste the bootstrap token at the hidden prompt, and give the account id and
+zone id from the zone's Overview page when asked. The script creates the
+four tokens, reads each back to check its policies, stores them in Proton
+Pass, sets the secrets and the `CLOUDFLARE_ACCOUNT_ID` variable, and deletes
+the bootstrap token.
+
+**By hand:** In the Cloudflare dashboard → My Profile → API Tokens (or Manage
 Account → Account API Tokens for account-owned tokens) → Create Token →
 Custom token. Create four tokens, each with a one-year expiry, scoped to
 this account and, for zone permissions, to `<zone_name>` only. The exact
@@ -161,12 +171,9 @@ If github:cloudflare-opentofu:1 recorded an environment as skipped (its
 fallback), drop `--env <name>` for that environment's secrets and set them
 at repository level.
 
-**Verify (Claude runs):** ask the user to run, for each token,
-`curl -s -H "Authorization: Bearer <token>" https://api.cloudflare.com/client/v4/user/tokens/verify | jq .result.status`
-themselves (so the token never enters the conversation), then run
-`gh secret list --repo $R` and `gh secret list --repo $R --env production`
-(and `infra`, `beta`).
-**Expected:** each verify prints `"active"`; every secret is listed in the
+**Verify (Claude runs):** `gh secret list --repo $R` and
+`gh secret list --repo $R --env production` (and `infra`, `beta`).
+**Expected:** every secret is listed in the
 right place.
 
 ### cloudflare-opentofu:2 Create the state bucket

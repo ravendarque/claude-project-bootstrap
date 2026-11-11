@@ -48,6 +48,17 @@ test("loadContext refuses a directory with no bootstrap answers", () => {
   assert.throws(() => loadContext(projectDir({ owner: "" })), /owner/);
 });
 
+test("loadContext exposes the project directory", () => {
+  const dir = projectDir();
+  assert.equal(loadContext(dir).dir, dir);
+});
+
+test("Vault reads one field of an item by id", async () => {
+  const deps = stubDeps(() => ({ stdout: "tok123\n" }));
+  assert.equal(await newVault(deps).field("item1", "token id"), "tok123");
+  assert.deepEqual(deps.calls[0].args, ["item", "view", "--vault-name", "Dev", "--item-id", "item1", "--field", "token id"]);
+});
+
 test("resolveEnv falls back to repository level for skipped environments", () => {
   const ctx = loadContext(projectDir({ skippedEnvs: "infra" }));
   assert.equal(resolveEnv(ctx, "infra"), null);
