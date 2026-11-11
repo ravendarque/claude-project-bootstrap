@@ -132,6 +132,9 @@ test("the board sync uses the App's token for an organisation and the PAT for a 
   assert.match(org, /client-id: \$\{\{ vars\.BOARD_SYNC_APP_CLIENT_ID \}\}/);
   assert.match(org, /private-key: \$\{\{ secrets\.BOARD_SYNC_APP_PRIVATE_KEY \}\}/);
   assert.match(org, /owner: \$\{\{ github\.repository_owner \}\}/);
+  assert.match(org, /repositories: \$\{\{ github\.event\.repository\.name \}\}/);
+  assert.match(org, /permission-issues: read/);
+  assert.match(org, /permission-organization-projects: write/);
   assert.match(org, /GH_TOKEN: \$\{\{ steps\.token\.outputs\.token \}\}/);
   assert.doesNotMatch(org, /PROJECT_STATUS_PAT/);
   const user = read(renders.core, SYNC);
