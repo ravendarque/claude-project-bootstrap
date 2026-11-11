@@ -16,7 +16,7 @@ const ctx = () => loadContext(projectDir());
 const json = body => ({ ok: true, status: 200, json: async () => body });
 
 test("buildManifest asks for contents and workflows write only", () => {
-  const manifest = buildManifest(ctx(), "http://127.0.0.1:1/callback");
+  const manifest = buildManifest({ name: "sample-project-release", url: "https://github.com/sample-owner/sample-project", permissions: { contents: "write", workflows: "write" } }, "http://127.0.0.1:1/callback");
   assert.deepEqual(manifest.default_permissions, { contents: "write", workflows: "write" });
   assert.equal(manifest.public, false);
   assert.equal(manifest.hook_attributes.active, false);

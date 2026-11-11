@@ -39,9 +39,9 @@ export function vaultResponder({ folders = [], items = [] } = {}) {
   };
 }
 
-export function projectDir({ owner = "sample-owner", name = "Sample Project", slug = "sample-project", zone_name, skippedEnvs } = {}) {
+export function projectDir({ owner = "sample-owner", name = "Sample Project", slug = "sample-project", zone_name, skippedEnvs, visibility } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "secrets-"));
-  saveRun(dir, { answers: { owner, name, slug, ...(zone_name && { zone_name }) }, modules: ["core"] });
+  saveRun(dir, { answers: { owner, name, slug, ...(zone_name && { zone_name }), ...(visibility && { visibility }) }, modules: ["core"] });
   if (skippedEnvs) recordId(dir, "skipped_envs", skippedEnvs);
   return dir;
 }

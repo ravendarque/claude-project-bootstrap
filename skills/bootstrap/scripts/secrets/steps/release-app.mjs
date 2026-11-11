@@ -15,7 +15,7 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
   const state = randomBytes(16).toString("hex");
   const actionUrl = newAppUrl(await ownerType(deps, ctx.owner), ctx.owner, state);
   const { code } = await waitForCallback(deps, state, {
-    manifestFor: redirectUrl => buildManifest(ctx, redirectUrl),
+    manifestFor: redirectUrl => buildManifest({ name: `${ctx.slug}-release`, url: `https://github.com/${ctx.repo}`, permissions: { contents: "write", workflows: "write" } }, redirectUrl),
     actionUrl,
     onListening: ({ url }) => {
       deps.log(`Opening your browser: click "Create GitHub App" when GitHub asks.`);

@@ -23,6 +23,19 @@ export async function setVariable(deps, repo, name, value) {
   await gh(deps, ["variable", "set", name, "--repo", repo], value);
 }
 
+export async function orgVariableExists(deps, org, name) {
+  const out = await gh(deps, ["variable", "list", "--org", org, "--json", "name"]);
+  return JSON.parse(out || "[]").some(entry => entry.name === name);
+}
+
+export async function setOrgSecret(deps, org, name, value) {
+  await gh(deps, ["secret", "set", name, "--org", org, "--visibility", "all"], value);
+}
+
+export async function setOrgVariable(deps, org, name, value) {
+  await gh(deps, ["variable", "set", name, "--org", org, "--visibility", "all"], value);
+}
+
 export async function secretsExist(deps, ctx, secrets) {
   for (const { name, env } of secrets) {
     if (!(await secretExists(deps, ctx.repo, name, resolveEnv(ctx, env)))) return false;
