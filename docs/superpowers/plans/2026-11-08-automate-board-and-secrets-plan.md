@@ -1,5 +1,19 @@
 # Automate the board and the secrets: implementation plan
 
+> **As built:** the layout differs from the task file lists below in a few
+> places.
+> - Each step is a default export in
+>   `skills/bootstrap/scripts/secrets/steps/<step>.mjs`, with an optional
+>   `tools` list.
+> - Shared code is in `secrets/order.mjs` (`storeThenSet`),
+>   `secrets/github-app.mjs` (the manifest flow) and `secrets/cloudflare.mjs`
+>   (the API client, permission resolution, token creation and rotation
+>   helpers).
+> - The Cloudflare steps prompt for the account id and zone id, and resolve
+>   each permission by name and scope.
+> - Copies of the template keep Auto-archive, so `core:3` only turns on
+>   Auto-add.
+
 > **Execution:** follows `docs/working-with-claude.md`. One Sonnet-class subagent
 > (`model: sonnet`, in its own worktree) implements the tasks in order. The
 > main session sends each next task, and any fix, to that same subagent as a
