@@ -28,8 +28,18 @@ export function appJwt(clientId, pem, now) {
 
 const escapeHtml = text => text.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 
-function manifestPage(manifest, state) {
-  const action = `https://github.com/settings/apps/new?state=${encodeURIComponent(state)}`;
+export function newAppUrl(type, owner, state) {
+  const settings = type === "Organization" ? `organizations/${encodeURIComponent(owner)}/settings` : "settings";
+  return `https://github.com/${settings}/apps/new?state=${encodeURIComponent(state)}`;
+}
+
+export async function ownerType(deps, owner) {
+  const response = await deps.fetch(`${API}/users/${encodeURIComponent(owner)}`, { headers: API_HEADERS });
+  if (!response.ok) throw new Error(`Couldn't look up the GitHub owner ${owner} (HTTP ${response.status})`);
+  return (await response.json()).type;
+}
+
+function manifestPage(manifest, action) {
   return `<!doctype html>
 <meta charset="utf-8">
 <title>Create the release App</title>
@@ -41,7 +51,7 @@ function manifestPage(manifest, state) {
 `;
 }
 
-export function waitForCallback(deps, state, { manifestFor, onListening, timeoutMs = HOUR_MS } = {}) {
+export function waitForCallback(deps, state, { manifestFor, onListening, actionUrl = newAppUrl("User", "", state), timeoutMs = HOUR_MS } = {}) {
   return new Promise((resolve, reject) => {
     let redirectUrl;
     let settled = false;
@@ -52,7 +62,7 @@ export function waitForCallback(deps, state, { manifestFor, onListening, timeout
         res.end(body);
       };
       if (req.method !== "GET") return reply(405, "text/plain", "Method not allowed");
-      if (url.pathname === "/") return reply(200, "text/html", manifestPage(manifestFor(redirectUrl), state));
+      if (url.pathname === "/") return reply(200, "text/html", manifestPage(manifestFor(redirectUrl), actionUrl));
       if (url.pathname !== "/callback") return reply(404, "text/plain", "Not found");
       const code = url.searchParams.get("code");
       if (url.searchParams.get("state") !== state || !code) return reply(400, "text/plain", "Wrong or missing state");

@@ -93,10 +93,15 @@ workflows, so releases (and deploys) would never fire.
 `node <skill dir>/scripts/secrets.mjs release-app <project dir>`. In the
 browser it opens, click "Create GitHub App", then install the App on this
 repository only. The script stores the key in Proton Pass and sets the
-variable and secret.
+variable and secret. When the owner is an organisation, the App is created
+under that organisation.
 
 **By hand:**
 1. GitHub → Settings → Developer settings → GitHub Apps → New GitHub App.
+   For an organisation, use the organisation's settings
+   (`https://github.com/organizations/<owner>/settings/apps/new`), not
+   your account's: an App owned by your account can't be installed on the
+   organisation's repositories.
 2. Name: `<slug>-release`. Homepage URL: the repository URL. Untick
    Webhook → Active.
 3. Repository permissions: Contents → Read and write, and Workflows → Read

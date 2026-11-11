@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createPublicKey, createVerify, generateKeyPairSync } from "node:crypto";
 import { loadContext } from "../skills/bootstrap/scripts/secrets/context.mjs";
 import { Vault } from "../skills/bootstrap/scripts/secrets/vault.mjs";
-import releaseApp, { appJwt, buildManifest, waitForCallback } from "../skills/bootstrap/scripts/secrets/steps/release-app.mjs";
+import releaseApp, { appJwt, buildManifest, newAppUrl, ownerType, waitForCallback } from "../skills/bootstrap/scripts/secrets/steps/release-app.mjs";
 import { runCli } from "../skills/bootstrap/scripts/secrets.mjs";
 import { projectDir, stubDeps, vaultResponder } from "./helpers-secrets.mjs";
 
@@ -58,14 +58,16 @@ test("callback times out with a clear error", async () => {
   await assert.rejects(waitForCallback(stubDeps(), "s", { manifestFor: () => ({}), timeoutMs: 20 }), /Timed out/);
 });
 
-function stepHarness({ repos = ["sample-owner/sample-project"], installed = true } = {}) {
+function stepHarness({ repos = ["sample-owner/sample-project"], installed = true, ownerKind = "User" } = {}) {
   const pem = privateKey;
   const respond = vaultResponder();
   const fetched = [];
+  const pages = [];
   const deps = stubDeps(respond);
   let driver;
   deps.fetch = async (url, init = {}) => {
     fetched.push({ url, init });
+    if (url.endsWith("/users/sample-owner")) return json({ type: ownerKind });
     if (url.endsWith("/conversions")) return json({ id: 7, client_id: "Iv1.abc", pem, html_url: "https://github.com/apps/sample-project-release", slug: "sample-project-release", client_secret: "cs", webhook_secret: "ws" });
     if (url.endsWith("/app/installations")) return json(installed ? [{ id: 99, account: { login: "sample-owner" } }] : []);
     if (url.endsWith("/access_tokens")) return json({ token: "inst-token" });
@@ -76,11 +78,12 @@ function stepHarness({ repos = ["sample-owner/sample-project"], installed = true
     if (!url.startsWith("http://127.0.0.1")) return;
     driver = (async () => {
       const page = await (await fetch(url)).text();
+      pages.push(page);
       const state = page.match(/state=([0-9a-f]+)"/)[1];
       await fetch(`${url}callback?code=the-code&state=${state}`);
     })();
   };
-  return { deps, pem, fetched, done: () => driver };
+  return { deps, pem, fetched, pages, done: () => driver };
 }
 
 test("release-app stores the PEM before setting the secret, and never passes it as an argument", async () => {
@@ -135,4 +138,46 @@ test("release-app short-circuits when the secret exists", async () => {
   const deps = stubDeps(cmd => (cmd === "gh" ? { stdout: JSON.stringify([{ name: "RELEASE_APP_PRIVATE_KEY" }]) } : {}));
   assert.equal(await runCli(["release-app", dir], deps), 0);
   assert.match(deps.logs.join("\n"), /already exist/);
+});
+
+test("newAppUrl posts to the user's settings for a user owner", () => {
+  assert.equal(newAppUrl("User", "sample-owner", "s t"), "https://github.com/settings/apps/new?state=s%20t");
+});
+
+test("newAppUrl posts to the organisation's settings for an org owner", () => {
+  assert.equal(newAppUrl("Organization", "one-org", "abc"), "https://github.com/organizations/one-org/settings/apps/new?state=abc");
+});
+
+test("ownerType reads the owner's type from the users API", async () => {
+  const calls = [];
+  const deps = { ...stubDeps(), fetch: async url => (calls.push(url), json({ type: "Organization" })) };
+  assert.equal(await ownerType(deps, "one-org"), "Organization");
+  assert.deepEqual(calls, ["https://api.github.com/users/one-org"]);
+});
+
+test("ownerType refuses an owner GitHub doesn't know", async () => {
+  const deps = { ...stubDeps(), fetch: async () => ({ ok: false, status: 404 }) };
+  await assert.rejects(ownerType(deps, "nobody"), /Couldn't look up the GitHub owner nobody \(HTTP 404\)/);
+});
+
+test("the manifest page posts to the URL it's given", async () => {
+  const waiting = waitForCallback(stubDeps(), "st", {
+    manifestFor: () => ({ name: "x" }),
+    actionUrl: "https://github.com/organizations/one-org/settings/apps/new?state=st",
+    onListening: async ({ url }) => {
+      const page = await (await fetch(url)).text();
+      assert.match(page, /action="https:\/\/github\.com\/organizations\/one-org\/settings\/apps\/new\?state=st"/);
+      await fetch(`${url}callback?state=st&code=c`);
+    },
+  });
+  assert.equal((await waiting).code, "c");
+});
+
+test("release-app creates the App under the organisation when the owner is one", async () => {
+  const c = ctx();
+  const { deps, pages, done } = stepHarness({ ownerKind: "Organization" });
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 });
+  await done();
+  assert.match(pages[0], /action="https:\/\/github\.com\/organizations\/sample-owner\/settings\/apps\/new\?state=[0-9a-f]+"/);
 });

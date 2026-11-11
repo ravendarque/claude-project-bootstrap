@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { buildManifest, convertManifest, verifyInstallation, waitForCallback } from "../github-app.mjs";
+import { buildManifest, convertManifest, newAppUrl, ownerType, verifyInstallation, waitForCallback } from "../github-app.mjs";
 import { storeThenSet } from "../order.mjs";
 
-export { appJwt, buildManifest, waitForCallback } from "../github-app.mjs";
+export { appJwt, buildManifest, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
 
 const SECRET = "RELEASE_APP_PRIVATE_KEY";
 const VARIABLE = "RELEASE_APP_CLIENT_ID";
@@ -13,8 +13,10 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
     return;
   }
   const state = randomBytes(16).toString("hex");
+  const actionUrl = newAppUrl(await ownerType(deps, ctx.owner), ctx.owner, state);
   const { code } = await waitForCallback(deps, state, {
     manifestFor: redirectUrl => buildManifest(ctx, redirectUrl),
+    actionUrl,
     onListening: ({ url }) => {
       deps.log(`Opening your browser: click "Create GitHub App" when GitHub asks.`);
       deps.openUrl(url);
