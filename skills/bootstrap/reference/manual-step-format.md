@@ -16,6 +16,12 @@ setting a secret, a console setting with no API. Write each one as:
 **Expected:** what the output must show.
 ```
 
+When `scripts/secrets.mjs` automates a step, **Do** gives the command the
+user runs in their own terminal, plus any clicks it still needs. The
+original instructions follow under **By hand:**, for when the script can't
+be used. Claude never runs `secrets.mjs` itself, because it handles the
+secrets.
+
 Present one step at a time. Wait for the user to say it's done, run the
 verification and show the result. If verification fails, say what's
 wrong and repeat the step; never mark it done on the user's word alone
