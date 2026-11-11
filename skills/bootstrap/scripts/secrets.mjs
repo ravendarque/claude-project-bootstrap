@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import { loadContext } from "./secrets/context.mjs";
@@ -73,6 +73,14 @@ export async function runCli(argv, deps, { steps } = {}) {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+function launchedDirectly() {
+  try {
+    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
+
+if (launchedDirectly()) {
   process.exitCode = await runCli(process.argv.slice(2), realDeps);
 }

@@ -1,5 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadContext, resolveEnv } from "../skills/bootstrap/scripts/secrets/context.mjs";
 import { Vault } from "../skills/bootstrap/scripts/secrets/vault.mjs";
 import { secretExists, setSecret } from "../skills/bootstrap/scripts/secrets/github.mjs";
@@ -245,4 +250,12 @@ test("only a GitHub failure marks the error as stored", async () => {
   const respondPass = vaultResponder();
   const pass = stubDeps((cmd, args, o) => (cmd === "pass-cli" && args[1] === "create" ? { status: 1 } : respondPass(cmd, args, o)));
   await assert.rejects(storeThenSet(pass, newVault(pass), ctx, options()), error => error.stored === undefined);
+});
+
+test("the script runs when launched through a symlinked directory", () => {
+  const link = join(mkdtempSync(join(tmpdir(), "link-")), "scripts");
+  symlinkSync(fileURLToPath(new URL("../skills/bootstrap/scripts", import.meta.url)), link);
+  const result = spawnSync(process.execPath, [join(link, "secrets.mjs")], { encoding: "utf8" });
+  assert.equal(result.status, 2);
+  assert.match(result.stdout, /Usage: secrets\.mjs/);
 });
