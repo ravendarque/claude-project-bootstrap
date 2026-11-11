@@ -1,24 +1,67 @@
 import { randomBytes } from "node:crypto";
 import { awaitInstallation, buildManifest, convertManifest, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
-import { orgVariableExists } from "../github.mjs";
+import { orgVariableExists, setOrgSecret, setOrgVariable } from "../github.mjs";
 import { storeThenSet } from "../order.mjs";
 
 const SECRET = "BOARD_SYNC_APP_PRIVATE_KEY";
 const VARIABLE = "BOARD_SYNC_APP_CLIENT_ID";
+const TITLE = "board-sync App";
+
+async function variableExists(deps, owner) {
+  try {
+    return await orgVariableExists(deps, owner, VARIABLE);
+  } catch (error) {
+    if (error.message.includes("admin:org")) {
+      throw new Error("board-app needs the admin:org scope: run gh auth refresh -h github.com -s admin:org, then re-run", { cause: error });
+    }
+    throw error;
+  }
+}
+
+async function checkInstallation(ctx, deps, app, { pollIntervalMs, pollLimitMs }) {
+  const installation = await awaitInstallation(deps, ctx.owner, app, {
+    intervalMs: pollIntervalMs,
+    limitMs: pollLimitMs,
+    notInstalledHint: `install it on ${ctx.owner} with "All repositories"; the secret and variable are already set`,
+  });
+  if (installation.repository_selection !== "all") {
+    deps.log(`The App is installed on selected repositories only. Choose All repositories in its installation settings.`);
+    throw new Error(`The board-sync App's installation must cover all repositories of ${ctx.owner}`);
+  }
+  deps.log(`The board-sync App is installed on all of ${ctx.owner}'s repositories.`);
+}
+
+async function resume(ctx, deps, vault, itemId, options) {
+  deps.log("Resuming: the board-sync App already exists in Pass");
+  const clientId = await vault.field(itemId, "client id");
+  const pem = await vault.field(itemId, "private key");
+  const htmlUrl = await vault.field(itemId, "App URL").catch(() => "");
+  await setOrgSecret(deps, ctx.owner, SECRET, pem);
+  await setOrgVariable(deps, ctx.owner, VARIABLE, clientId);
+  if (!htmlUrl) {
+    deps.log(`The Pass item has no App URL: open the App's settings on GitHub and install it on ${ctx.owner} with "All repositories".`);
+    return;
+  }
+  deps.log(`Install the App on ${ctx.owner}: choose "All repositories".`);
+  deps.openUrl(`${htmlUrl}/installations/new`);
+  await checkInstallation(ctx, deps, { clientId, pem }, options);
+}
 
 async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
   if (rotate) {
-    deps.log(`board-app can't rotate: GitHub has no API to make a new App key. Generate one in the App's settings and follow core:1 "By hand".`);
+    deps.log(`board-app can't rotate: GitHub has no API to make a new App key. Generate one in the App's settings and follow core:2 "By hand".`);
     return;
   }
   const type = await ownerType(deps, ctx.owner);
   if (type !== "Organization") {
     throw new Error(`The board-sync App is only for organisation owners, and ${ctx.owner} is a ${type}: use the board-token step instead`);
   }
-  if (await orgVariableExists(deps, ctx.owner, VARIABLE)) {
+  if (await variableExists(deps, ctx.owner)) {
     deps.log(`The board-sync App already exists for ${ctx.owner}: nothing to do.`);
     return;
   }
+  const earlier = await vault.find(TITLE);
+  if (earlier) return resume(ctx, deps, vault, earlier, { pollIntervalMs, pollLimitMs });
   const state = randomBytes(16).toString("hex");
   const { code } = await waitForCallback(deps, state, {
     manifestFor: redirectUrl =>
@@ -31,11 +74,12 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
   });
   const app = await convertManifest(deps, code);
   await storeThenSet(deps, vault, ctx, {
-    title: "board-sync App",
+    title: TITLE,
     fields: [
       { name: "App id", value: String(app.id), hidden: false },
       { name: "client id", value: app.clientId, hidden: false },
       { name: "private key", value: app.pem, hidden: true },
+      { name: "App URL", value: app.htmlUrl, hidden: false },
     ],
     note: `GitHub App ${app.htmlUrl}. The private key is the organisation secret ${SECRET}; the client id is the organisation variable ${VARIABLE}.`,
     secrets: [{ name: SECRET, value: app.pem, scope: "org" }],
@@ -43,16 +87,7 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
   });
   deps.log(`Install the App on ${ctx.owner}: choose "All repositories".`);
   deps.openUrl(`${app.htmlUrl}/installations/new`);
-  const installation = await awaitInstallation(deps, ctx.owner, app, {
-    intervalMs: pollIntervalMs,
-    limitMs: pollLimitMs,
-    notInstalledHint: `install it on ${ctx.owner} with "All repositories"; the secret and variable are already set`,
-  });
-  if (installation.repository_selection !== "all") {
-    deps.log(`The App is installed on selected repositories only. Choose All repositories in its installation settings.`);
-    throw new Error(`The board-sync App's installation must cover all repositories of ${ctx.owner}`);
-  }
-  deps.log(`The board-sync App is installed on all of ${ctx.owner}'s repositories.`);
+  await checkInstallation(ctx, deps, app, { pollIntervalMs, pollLimitMs });
 }
 
 export default { name: "board-app", secrets: () => [], folder: ctx => ctx.owner, run };

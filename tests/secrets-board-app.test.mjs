@@ -18,14 +18,20 @@ const ctx = options => loadContext(projectDir({ owner: "one-org", ...options }))
 const json = body => ({ ok: true, status: 200, json: async () => body });
 const OPTIONS = { pollIntervalMs: 1, pollLimitMs: 50 };
 
-function harness({ ownerKind = "Organization", installed = true, selection = "all", variableExists = false } = {}) {
+function harness({ ownerKind = "Organization", installed = true, selection = "all", variableExists = false, listFails = false, items = [], folders = [], appUrl = "https://github.com/apps/one-org-board-sync" } = {}) {
   const fetched = [];
   const pages = [];
   const opened = [];
-  const vaultFake = vaultResponder();
+  const vaultFake = vaultResponder({ items, folders });
   const deps = stubDeps((cmd, args, options) => {
     if (cmd === "gh" && args[0] === "variable" && args[1] === "list") {
+      if (listFails) return { status: 1, stderr: 'HTTP 403: This API operation needs the "admin:org" scope. To request it, run: gh auth refresh -h github.com -s admin:org' };
       return { stdout: JSON.stringify(variableExists ? [{ name: "BOARD_SYNC_APP_CLIENT_ID" }] : []) };
+    }
+    if (cmd === "pass-cli" && args[0] === "item" && args[1] === "view") {
+      const field = args[args.indexOf("--field") + 1];
+      if (field === "App URL" && !appUrl) return { status: 1, stderr: "no such field" };
+      return { stdout: { "client id": "Iv1.board", "private key": privateKey, "App URL": appUrl }[field] };
     }
     return vaultFake(cmd, args, options);
   });
@@ -97,7 +103,7 @@ test("board-app stores the key in the organisation's Pass folder, then sets the 
   const create = deps.calls.find(call => call.args[0] === "item" && call.args[1] === "create");
   const item = JSON.parse(create.input);
   assert.equal(item.title, "board-sync App");
-  assert.deepEqual(item.sections[0].fields.map(f => [f.field_name, f.field_type]), [["App id", "text"], ["client id", "text"], ["private key", "hidden"]]);
+  assert.deepEqual(item.sections[0].fields.map(f => [f.field_name, f.field_type]), [["App id", "text"], ["client id", "text"], ["private key", "hidden"], ["App URL", "text"]]);
   const secret = deps.calls.find(call => call.args[0] === "secret");
   assert.deepEqual(secret.args, ["secret", "set", "BOARD_SYNC_APP_PRIVATE_KEY", "--org", "one-org", "--visibility", "all"]);
   assert.equal(secret.input, privateKey);
@@ -165,7 +171,7 @@ test("board-app has no --rotate", async () => {
   const deps = stubDeps();
   assert.equal(await runCli(["board-app", dir, "--rotate"], deps), 0);
   assert.deepEqual(deps.calls.map(call => call.cmd), ["gh", "pass-cli"]);
-  assert.match(deps.logs.join("\n"), /board-app can't rotate.*core:1 "By hand"/);
+  assert.match(deps.logs.join("\n"), /board-app can't rotate.*core:2 "By hand"/);
 });
 
 test("board-app's Pass folder is the organisation, not the slug", () => {
@@ -225,4 +231,43 @@ test("board-app-repo reads from the organisation folder when run through the CLI
 
 test("board-app-repo declares the repository secret", () => {
   assert.deepEqual(boardAppRepo.secrets(ctx()), [{ name: "BOARD_SYNC_APP_PRIVATE_KEY" }]);
+});
+
+test("board-app stops before any browser or Pass work when gh lacks the admin:org scope", async () => {
+  const c = ctx();
+  const { deps, opened } = harness({ listFails: true });
+  await assert.rejects(runBoardApp(c, deps), /board-app needs the admin:org scope: run gh auth refresh -h github\.com -s admin:org, then re-run/);
+  assert.deepEqual(deps.calls.map(call => call.cmd), ["gh"]);
+  assert.deepEqual(opened, []);
+});
+
+const earlierItem = { items: [{ id: "i1", title: "board-sync App", folder_id: "f1" }], folders: [folder("f1", "one-org")] };
+
+test("board-app resumes from the Pass item: no second App, both org writes on stdin, then the install check", async () => {
+  const c = ctx();
+  const { deps, opened, fetched } = harness(earlierItem);
+  await runBoardApp(c, deps);
+  assert.match(deps.logs.join("\n"), /Resuming: the board-sync App already exists in Pass/);
+  assert.ok(!deps.calls.some(call => call.args[0] === "item" && call.args[1] === "create"));
+  assert.ok(!opened.some(url => url.startsWith("http://127.0.0.1")), "no manifest callback");
+  assert.ok(!fetched.some(f => f.url.endsWith("/conversions")));
+  const secret = deps.calls.find(call => call.args[0] === "secret");
+  assert.deepEqual(secret.args, ["secret", "set", "BOARD_SYNC_APP_PRIVATE_KEY", "--org", "one-org", "--visibility", "all"]);
+  assert.equal(secret.input, privateKey.trim());
+  const variable = deps.calls.find(call => call.args[0] === "variable" && call.args[1] === "set");
+  assert.equal(variable.input, "Iv1.board");
+  assert.deepEqual(variable.args, ["variable", "set", "BOARD_SYNC_APP_CLIENT_ID", "--org", "one-org", "--visibility", "all"]);
+  assert.ok(opened.includes("https://github.com/apps/one-org-board-sync/installations/new"));
+  assert.match(deps.logs.join("\n"), /installed on all/);
+  for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")));
+});
+
+test("board-app resume without an App URL sets the values and tells you to install by hand", async () => {
+  const c = ctx();
+  const { deps, opened, fetched } = harness({ ...earlierItem, appUrl: "" });
+  await runBoardApp(c, deps);
+  assert.ok(deps.calls.some(call => call.args[0] === "secret" && call.args[1] === "set"));
+  assert.deepEqual(opened, []);
+  assert.ok(!fetched.some(f => f.url.endsWith("/app/installations")));
+  assert.match(deps.logs.join("\n"), /no App URL: open the App's settings/);
 });
