@@ -43,7 +43,7 @@ test("loadContext exposes the project directory", () => {
 test("Vault reads one field of an item by id", async () => {
   const deps = stubDeps(() => ({ stdout: "tok123\n" }));
   assert.equal(await newVault(deps).field("item1", "token id"), "tok123");
-  assert.deepEqual(deps.calls[0].args, ["item", "view", "--vault-name", "Dev", "--item-id", "item1", "--field", "token id"]);
+  assert.deepEqual(deps.calls[0].args, ["item", "view", "--vault-name", "Dev", "--item-id=item1", "--field", "token id"]);
 });
 
 test("resolveEnv falls back to repository level for skipped environments", () => {
@@ -89,7 +89,7 @@ test("Vault creates a custom item from JSON on stdin and returns its id", async 
   const id = await newVault(deps).create("release App", [{ name: "key", value: "s3cret", hidden: true }, { name: "id", value: "42", hidden: false }], "note");
   assert.equal(id, "new0");
   const create = deps.calls.find(c => isCall(c, "item", "create"));
-  assert.deepEqual(create.args, ["item", "create", "custom", "--from-template", "-", "--vault-name", "Dev", "--folder-id", "f1"]);
+  assert.deepEqual(create.args, ["item", "create", "custom", "--from-template", "-", "--vault-name", "Dev", "--folder-id=f1"]);
   const body = JSON.parse(create.input);
   assert.equal(body.title, "release App");
   assert.equal(body.note, "note");
@@ -105,7 +105,7 @@ test("Vault creates a custom item from JSON on stdin and returns its id", async 
 test("Vault trashes an item by id in its vault", async () => {
   const deps = stubDeps();
   await newVault(deps).trash("a");
-  assert.deepEqual(deps.calls[0].args, ["item", "trash", "--vault-name", "Dev", "--item-id", "a"]);
+  assert.deepEqual(deps.calls[0].args, ["item", "trash", "--vault-name", "Dev", "--item-id=a"]);
 });
 
 test("setSecret passes the value on stdin, never in args", async () => {
@@ -202,7 +202,7 @@ test("rotation trashes the old item only after the secrets are set", async () =>
   const trash = order.indexOf("pass-cli item trash");
   assert.ok(trash > order.lastIndexOf("gh secret set"));
   assert.ok(trash > order.indexOf("pass-cli item create"));
-  assert.ok(deps.calls[trash].args.includes("old"));
+  assert.ok(deps.calls[trash].args.includes("--item-id=old"));
 });
 
 test("rotation with no earlier item creates one and trashes nothing", async () => {
@@ -267,4 +267,17 @@ test("the vault is listed once per change, not once per lookup", async () => {
   const rotated = newVault(rotating);
   for (const n of [1, 2, 3, 4]) await storeThenSet(rotating, rotated, ctx, options({ title: `item ${n}`, rotate: true }));
   assert.ok(lists(rotating) <= 1 + 2 * 4, `listed ${lists(rotating)} times`);
+});
+
+test("ids that start with a dash reach pass-cli as one argument", async () => {
+  const deps = stubDeps(passFake({ folders: [folder("-Dabc", "sample-project")] }));
+  const vault = new Vault(deps, { vault: "Dev", folder: "sample-project" });
+  await vault.create("t", [], "").catch(() => {});
+  await vault.trash("-Xitem");
+  await vault.field("-Yitem", "token id");
+  const args = deps.calls.filter(call => call.cmd === "pass-cli").flatMap(call => call.args);
+  assert.ok(args.includes("--folder-id=-Dabc"));
+  assert.ok(args.includes("--item-id=-Xitem"));
+  assert.ok(args.includes("--item-id=-Yitem"));
+  assert.ok(!args.some(arg => /^-[A-Za-z]/.test(arg) && !arg.startsWith("--")), "no id is passed as a bare argument");
 });
