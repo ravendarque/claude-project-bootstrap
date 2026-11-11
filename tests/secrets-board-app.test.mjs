@@ -301,3 +301,34 @@ test("board-app tells you how to recover when Pass fails after the App was creat
   for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")), "no argument carries the PEM");
   assert.ok(!deps.logs.join("\n").includes("PRIVATE KEY"));
 });
+
+const SCOPE_ERROR = 'HTTP 403: This API operation needs the "admin:org" scope. To request it, run: gh auth refresh -h github.com -s admin:org';
+
+test("org writes tell you to refresh the gh token when it lacks admin:org, keeping the cause", async () => {
+  const deps = stubDeps(() => ({ status: 1, stderr: SCOPE_ERROR }));
+  for (const write of [() => setOrgSecret(deps, "one-org", "S", "v"), () => setOrgVariable(deps, "one-org", "V", "v")]) {
+    await assert.rejects(write(), error => {
+      assert.match(error.message, /needs the admin:org scope: run gh auth refresh -h github\.com -s admin:org, then re-run/);
+      assert.match(error.cause.message, /HTTP 403/);
+      return true;
+    });
+  }
+});
+
+test("org writes keep gh's own error for other failures", async () => {
+  const deps = stubDeps(() => ({ status: 1, stderr: "boom" }));
+  await assert.rejects(setOrgSecret(deps, "one-org", "S", "v"), /gh secret set failed \(exit 1\): boom/);
+});
+
+test("a failed org write after the Pass item exists is still marked stored, with the scope hint", async () => {
+  const c = ctx();
+  const { deps, done } = harness();
+  const base = deps.exec;
+  deps.exec = async (cmd, args, options) => (cmd === "gh" && args[0] === "secret" && args[1] === "set" ? { status: 1, stderr: SCOPE_ERROR } : base(cmd, args, options));
+  await assert.rejects(runBoardApp(c, deps), error => {
+    assert.equal(error.stored, true);
+    assert.match(error.cause.message, /needs the admin:org scope/);
+    return true;
+  });
+  await done();
+});
