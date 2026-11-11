@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { askId, buildPolicies, createVerified, findEarlierItems, oneYearFrom, readOldIds, resolvePermissions, revokeOld, storeEach, withBootstrapToken } from "../cloudflare.mjs";
+import { askId, buildPolicies, createVerified, findEarlierItems, oneYearFrom, readOldIds, resolvePermissions, storeEach, withBootstrapToken } from "../cloudflare.mjs";
 import { storeThenSet } from "../order.mjs";
 
 const title = token => `Cloudflare ${token} token`;
@@ -24,7 +24,7 @@ async function run(ctx, deps, { vault, rotate }) {
   const expires = oneYearFrom(deps.now());
 
   await withBootstrapToken(deps, accountId, async client => {
-    const oldIds = await readOldIds(vault, previous);
+    const olds = (await readOldIds(vault, previous)).map((old, index) => old && { ...old, name: tokens[index].token });
     const specs = [];
     for (const entry of tokens) {
       const groups = await resolvePermissions(client, accountId, entry.permissions);
@@ -45,8 +45,7 @@ async function run(ctx, deps, { vault, rotate }) {
         variables: index === 0 ? [{ name: "CLOUDFLARE_ACCOUNT_ID", value: accountId }] : [],
         rotate,
       });
-    });
-    await revokeOld(client, deps, accountId, Object.fromEntries(Object.entries(oldIds).map(([item, id]) => [item.replace(/^Cloudflare | token$/g, ""), id])));
+    }, olds);
   });
   deps.log("The four Cloudflare tokens are stored in Pass and set in GitHub.");
 }

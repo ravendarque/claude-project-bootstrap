@@ -271,12 +271,12 @@ test("a GitHub failure at the second token keeps it and revokes the two after", 
   assert.deepEqual(deletedTokens(cf).sort(), ["self", "tok3", "tok4"]);
 });
 
-test("a failed store during rotation doesn't revoke the old tokens", async () => {
+test("a failed store during rotation revokes only the old tokens already replaced", async () => {
   const items = ["Preview", "Deploy", "Infra plan", "Infra apply"].map((name, i) => ({ id: `old${i}`, title: `Cloudflare ${name} token`, folder_id: "f1" }));
   const cf = fakeCloudflare();
   const { run } = harness({ cf, items, passAnswers: { old0: "oldtok0", old1: "oldtok1" }, fail: createsItem("Cloudflare Deploy token") });
   await assert.rejects(run({ rotate: true }), /pass-cli item create failed/);
-  assert.ok(deletedTokens(cf).every(id => !id.startsWith("oldtok")));
+  assert.deepEqual(deletedTokens(cf).filter(id => id.startsWith("oldtok")), ["oldtok0"]);
 });
 
 test("a revoke that fails is reported for the dashboard", async () => {
@@ -397,4 +397,31 @@ test("R2 rotation revokes the old tokens after the secrets are set", async () =>
   assert.deepEqual(deletes.map(c => c.path.split("/").at(-1)), ["oldtok0", "oldtok1"]);
   assert.ok(deps.calls.map(label).lastIndexOf("gh secret set") > -1);
   assert.ok(cf.log.findIndex(c => c.path.endsWith("tokens/self") && c.method === "DELETE") > deletes.at(-1).index);
+});
+
+const oldItems = titles => titles.map((title, i) => ({ id: `old${i}`, title, folder_id: "f1" }));
+const oldTokens = { old0: "oldtok0", old1: "oldtok1", old2: "oldtok2", old3: "oldtok3" };
+
+test("a failed rotation at the third token revokes the first two old tokens and keeps the rest", async () => {
+  const cf = fakeCloudflare();
+  const items = oldItems(["Preview", "Deploy", "Infra plan", "Infra apply"].map(name => `Cloudflare ${name} token`));
+  const { run } = harness({ cf, items, passAnswers: oldTokens, fail: createsItem("Cloudflare Infra plan token") });
+  await assert.rejects(run({ rotate: true }), /pass-cli item create failed/);
+  assert.deepEqual(deletedTokens(cf).sort(), ["oldtok0", "oldtok1", "self", "tok3", "tok4"]);
+});
+
+test("a failed R2 rotation at the second pair keeps the second old token", async () => {
+  const cf = fakeCloudflare();
+  const items = oldItems(["R2 state read-write", "R2 state read-only"]);
+  const { run } = r2({ cf, items, passAnswers: oldTokens, fail: createsItem("R2 state read-only") });
+  await assert.rejects(run({ rotate: true }), /pass-cli item create failed/);
+  assert.deepEqual(deletedTokens(cf).sort(), ["oldtok0", "self", "tok2"]);
+});
+
+test("a GitHub failure at a rotated token keeps its old token, which GitHub still holds", async () => {
+  const cf = fakeCloudflare();
+  const items = oldItems(["Preview", "Deploy", "Infra plan", "Infra apply"].map(name => `Cloudflare ${name} token`));
+  const { run } = harness({ cf, items, passAnswers: oldTokens, fail: (cmd, args) => cmd === "gh" && args[2] === "CLOUDFLARE_DEPLOY_TOKEN" });
+  await assert.rejects(run({ rotate: true }), /not set: CLOUDFLARE_DEPLOY_TOKEN/);
+  assert.deepEqual(deletedTokens(cf).sort(), ["oldtok0", "self", "tok3", "tok4"]);
 });

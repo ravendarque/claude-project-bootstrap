@@ -128,7 +128,8 @@ export async function createVerified(client, deps, accountId, specs) {
   return made;
 }
 
-export async function storeEach(client, deps, accountId, made, store) {
+export async function storeEach(client, deps, accountId, made, store, olds = []) {
+  const oldMap = list => Object.fromEntries(list.filter(Boolean).map(({ name, id }) => [name, id]));
   let current = 0;
   try {
     for (const [index, token] of made.entries()) {
@@ -137,8 +138,10 @@ export async function storeEach(client, deps, accountId, made, store) {
     }
   } catch (error) {
     for (const { id } of made.slice(error.stored ? current + 1 : current)) await revoke(client, deps, accountId, id);
+    await revokeOld(client, deps, accountId, oldMap(olds.slice(0, current)));
     throw error;
   }
+  await revokeOld(client, deps, accountId, oldMap(olds));
 }
 
 export async function revokeOld(client, deps, accountId, oldIds) {
@@ -153,9 +156,9 @@ export async function revokeOld(client, deps, accountId, oldIds) {
 }
 
 export async function readOldIds(vault, previous) {
-  const oldIds = {};
+  const olds = [];
   for (const [name, itemId] of Object.entries(previous)) {
-    if (itemId) oldIds[name] = await vault.field(itemId, "token id");
+    olds.push(itemId ? { name, id: await vault.field(itemId, "token id") } : undefined);
   }
-  return oldIds;
+  return olds;
 }

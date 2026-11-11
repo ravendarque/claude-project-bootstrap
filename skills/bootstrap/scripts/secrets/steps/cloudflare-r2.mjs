@@ -1,4 +1,4 @@
-import { askId, bucketResource, createVerified, findEarlierItems, oneYearFrom, R2_BUCKET_SCOPE, readOldIds, resolvePermissions, revokeOld, s3Credentials, storeEach, withBootstrapToken } from "../cloudflare.mjs";
+import { askId, bucketResource, createVerified, findEarlierItems, oneYearFrom, R2_BUCKET_SCOPE, readOldIds, resolvePermissions, s3Credentials, storeEach, withBootstrapToken } from "../cloudflare.mjs";
 import { storeThenSet } from "../order.mjs";
 
 const PAIRS = [
@@ -13,7 +13,7 @@ async function run(ctx, deps, { vault, rotate }) {
   const expires = oneYearFrom(deps.now());
 
   await withBootstrapToken(deps, accountId, async client => {
-    const oldIds = await readOldIds(vault, previous);
+    const olds = (await readOldIds(vault, previous)).map((old, index) => old && { ...old, name: PAIRS[index].title });
     const specs = [];
     for (const pair of PAIRS) {
       const [{ id }] = await resolvePermissions(client, accountId, [pair.permission], [R2_BUCKET_SCOPE]);
@@ -36,8 +36,7 @@ async function run(ctx, deps, { vault, rotate }) {
         secrets: [{ name: pair.id, ...env, value: accessKeyId }, { name: pair.secret, ...env, value: secretAccessKey }],
         rotate,
       });
-    });
-    await revokeOld(client, deps, accountId, oldIds);
+    }, olds);
   });
   deps.log("The R2 state credentials are stored in Pass and set in GitHub.");
 }
