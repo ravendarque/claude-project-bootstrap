@@ -189,3 +189,12 @@ test("the README lists the infra plan token's permissions explicitly", () => {
 test("the README says Transform Rules covers every zone in the account", () => {
   assert.match(read(withBeta, "infra/README.md"), /Transform Rules.*account-scoped.*every zone in the account/s);
 });
+
+test("every DNS record comment fits Cloudflare's 100-character Free plan limit", () => {
+  const dir = "skills/bootstrap/modules/cloudflare-opentofu/templates/infra";
+  const comments = readdirSync(dir)
+    .filter(file => file.endsWith(".tf"))
+    .flatMap(file => [...readFileSync(join(dir, file), "utf8").matchAll(/comment\s*=\s*"((?:[^"\\]|\\.)*)"/g)].map(match => ({ file, text: match[1] })));
+  assert.ok(comments.length > 0);
+  for (const { file, text } of comments) assert.ok(text.length <= 100, `${file}: ${text.length} characters: ${text}`);
+});
