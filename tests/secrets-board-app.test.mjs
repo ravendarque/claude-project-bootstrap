@@ -14,7 +14,7 @@ const { privateKey } = generateKeyPairSync("rsa", {
   privateKeyEncoding: { type: "pkcs1", format: "pem" },
   publicKeyEncoding: { type: "spki", format: "pem" },
 });
-const ctx = options => loadContext(projectDir({ owner: "one-org", ...options }));
+const ctx = options => loadContext(projectDir({ owner: "one-org", owner_type: "Organization", ...options }));
 const json = body => ({ ok: true, status: 200, json: async () => body });
 const OPTIONS = { pollIntervalMs: 1, pollLimitMs: 50 };
 
@@ -223,6 +223,12 @@ test("board-app-repo copies the client id and key from the organisation's Pass i
   assert.ok(!deps.logs.join("\n").includes("PRIVATE KEY"));
 });
 
+test("board-app-repo refuses a personal owner", async () => {
+  const deps = repoHarness();
+  await assert.rejects(runRepo(ctx({ visibility: "private", owner_type: "User" }), deps), /board-app-repo is for organisation owners; a personal owner uses board-token/);
+  assert.deepEqual(deps.calls, []);
+});
+
 test("board-app-repo refuses a public repository", async () => {
   const deps = repoHarness();
   await assert.rejects(runRepo(ctx({ visibility: "public" }), deps), /public repositories read the organisation secret/);
@@ -235,7 +241,7 @@ test("board-app-repo tells you to run board-app first when the Pass item is miss
 });
 
 test("board-app-repo reads from the organisation folder when run through the CLI", async () => {
-  const dir = projectDir({ owner: "one-org", visibility: "private" });
+  const dir = projectDir({ owner: "one-org", visibility: "private", owner_type: "Organization" });
   const deps = repoHarness();
   assert.equal(await runCli(["board-app-repo", dir], deps), 0);
   assert.ok(deps.calls.some(call => call.args[0] === "secret" && call.args[1] === "set"));

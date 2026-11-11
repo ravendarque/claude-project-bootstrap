@@ -5,6 +5,9 @@ const SECRET = "BOARD_SYNC_APP_PRIVATE_KEY";
 const VARIABLE = "BOARD_SYNC_APP_CLIENT_ID";
 
 async function run(ctx, deps, { vault }) {
+  if (ctx.answers.owner_type !== "Organization") {
+    throw new Error("board-app-repo is for organisation owners; a personal owner uses board-token");
+  }
   if (ctx.answers.visibility !== "private") {
     throw new Error(`${ctx.repo} isn't private: public repositories read the organisation secret, so there's nothing to copy`);
   }
