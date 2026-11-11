@@ -5,7 +5,7 @@ import { loadContext } from "../skills/bootstrap/scripts/secrets/context.mjs";
 import { Vault } from "../skills/bootstrap/scripts/secrets/vault.mjs";
 import releaseApp, { appJwt, buildManifest, newAppUrl, ownerType, waitForCallback } from "../skills/bootstrap/scripts/secrets/steps/release-app.mjs";
 import { runCli } from "../skills/bootstrap/scripts/secrets.mjs";
-import { projectDir, stubDeps, vaultResponder } from "./helpers-secrets.mjs";
+import { folder, projectDir, stubDeps, vaultResponder } from "./helpers-secrets.mjs";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -58,9 +58,17 @@ test("callback times out with a clear error", async () => {
   await assert.rejects(waitForCallback(stubDeps(), "s", { manifestFor: () => ({}), timeoutMs: 20 }), /Timed out/);
 });
 
-function stepHarness({ repos = ["sample-owner/sample-project"], installed = true, ownerKind = "User" } = {}) {
+function stepHarness({ repos = ["sample-owner/sample-project"], installed = true, ownerKind = "User", items = [], folders = [], appUrl = "https://github.com/apps/sample-project-release" } = {}) {
   const pem = privateKey;
-  const respond = vaultResponder();
+  const vaultFake = vaultResponder({ items, folders });
+  const respond = (cmd, args, options) => {
+    if (cmd === "pass-cli" && args[0] === "item" && args[1] === "view") {
+      const field = args[args.indexOf("--field") + 1];
+      if (field === "App URL" && !appUrl) return { status: 1, stderr: "no such field" };
+      return { stdout: { "client id": "Iv1.old", "private key": privateKey, "App URL": appUrl }[field] };
+    }
+    return vaultFake(cmd, args, options);
+  };
   const fetched = [];
   const pages = [];
   const deps = stubDeps(respond);
@@ -98,7 +106,7 @@ test("release-app stores the PEM before setting the secret, and never passes it 
   for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")), "no argument carries the PEM");
   const create = deps.calls.find(call => call.args[1] === "create" && call.args[0] === "item");
   const fields = JSON.parse(create.input).sections[0].fields;
-  assert.deepEqual(fields.map(f => [f.field_name, f.field_type]), [["App id", "text"], ["client id", "text"], ["private key", "hidden"]]);
+  assert.deepEqual(fields.map(f => [f.field_name, f.field_type]), [["App id", "text"], ["client id", "text"], ["private key", "hidden"], ["App URL", "text"]]);
   assert.equal(deps.calls.find(call => call.args[0] === "secret").input, pem);
   assert.equal(deps.calls.find(call => call.args[0] === "variable").input, "Iv1.abc");
   const conversion = fetched.find(f => f.url.endsWith("/conversions"));
@@ -197,4 +205,38 @@ test("release-app tells you how to recover when Pass fails after the App was cre
   assert.ok(!deps.calls.some(call => call.args[0] === "secret"));
   for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")), "no argument carries the PEM");
   assert.ok(!deps.logs.join("\n").includes("PRIVATE KEY"));
+});
+
+const earlierRelease = { items: [{ id: "i1", title: "release App", folder_id: "f1" }], folders: [folder("f1", "sample-project")] };
+
+test("release-app resumes from an earlier Pass item instead of creating a second App", async () => {
+  const c = ctx();
+  const { deps, fetched } = stepHarness(earlierRelease);
+  const opened = [];
+  const base = deps.openUrl;
+  deps.openUrl = url => (opened.push(url), base(url));
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 });
+  assert.match(deps.logs.join("\n"), /Resuming: the release App already exists in Pass/);
+  assert.ok(!opened.some(url => url.startsWith("http://127.0.0.1")), "no manifest callback");
+  assert.ok(!fetched.some(f => f.url.endsWith("/conversions")));
+  assert.ok(!deps.calls.some(call => call.args[0] === "item" && call.args[1] === "create"));
+  const secret = deps.calls.find(call => call.args[0] === "secret");
+  assert.deepEqual(secret.args, ["secret", "set", "RELEASE_APP_PRIVATE_KEY", "--repo", "sample-owner/sample-project"]);
+  assert.equal(secret.input, privateKey.trim());
+  const variable = deps.calls.find(call => call.args[0] === "variable");
+  assert.equal(variable.input, "Iv1.old");
+  assert.ok(opened.includes("https://github.com/apps/sample-project-release/installations/new"));
+  assert.match(deps.logs.join("\n"), /installed on sample-owner\/sample-project only/);
+  for (const call of deps.calls) assert.ok(!call.args.some(arg => arg.includes("PRIVATE KEY")));
+});
+
+test("release-app resume without an App URL sets the values and says how to check the installation", async () => {
+  const c = ctx();
+  const { deps, fetched } = stepHarness({ ...earlierRelease, appUrl: "" });
+  const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
+  await releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 });
+  assert.ok(deps.calls.some(call => call.args[0] === "secret" && call.args[1] === "set"));
+  assert.ok(!fetched.some(f => f.url.endsWith("/app/installations")));
+  assert.match(deps.logs.join("\n"), /no App URL.*Only select repositories/);
 });
