@@ -47,6 +47,19 @@ async function resume(ctx, deps, vault, itemId, options) {
   await checkInstallation(ctx, deps, { clientId, pem }, options);
 }
 
+async function confirmExisting(ctx, deps) {
+  const slug = `${ctx.owner}-board-sync`;
+  const result = await deps.exec("gh", ["api", `orgs/${ctx.owner}/installations`, "--paginate", "--jq", ".installations[] | [.app_slug, .repository_selection] | @tsv"]);
+  if (result.status !== 0) throw new Error(`gh api orgs/${ctx.owner}/installations failed (exit ${result.status}): ${result.stderr.trim()}`);
+  const row = result.stdout.split("\n").map(line => line.split("\t")).find(([appSlug]) => appSlug === slug);
+  if (!row) throw new Error(`The board-sync App isn't installed on ${ctx.owner}: install it with "All repositories"`);
+  if (row[1] !== "all") {
+    deps.log(`The App is installed on selected repositories only. Choose All repositories in its installation settings.`);
+    throw new Error(`The board-sync App's installation must cover all repositories of ${ctx.owner}`);
+  }
+  deps.log(`The board-sync App already exists for ${ctx.owner} and covers all repositories: nothing to do.`);
+}
+
 async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
   if (rotate) {
     deps.log(`board-app can't rotate: GitHub has no API to make a new App key. Generate one in the App's settings and follow core:2 "By hand".`);
@@ -57,7 +70,7 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
     throw new Error(`The board-sync App is only for organisation owners, and ${ctx.owner} is a ${type}: use the board-token step instead`);
   }
   if (await variableExists(deps, ctx.owner)) {
-    deps.log(`The board-sync App already exists for ${ctx.owner}: nothing to do.`);
+    await confirmExisting(ctx, deps);
     return;
   }
   const earlier = await vault.find(TITLE);

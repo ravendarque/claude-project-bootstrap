@@ -18,12 +18,13 @@ const ctx = options => loadContext(projectDir({ owner: "one-org", ...options }))
 const json = body => ({ ok: true, status: 200, json: async () => body });
 const OPTIONS = { pollIntervalMs: 1, pollLimitMs: 50 };
 
-function harness({ ownerKind = "Organization", installed = true, selection = "all", variableExists = false, listFails = false, items = [], folders = [], appUrl = "https://github.com/apps/one-org-board-sync" } = {}) {
+function harness({ ownerKind = "Organization", installed = true, selection = "all", variableExists = false, listFails = false, installations = "one-org-board-sync\tall\n", items = [], folders = [], appUrl = "https://github.com/apps/one-org-board-sync" } = {}) {
   const fetched = [];
   const pages = [];
   const opened = [];
   const vaultFake = vaultResponder({ items, folders });
   const deps = stubDeps((cmd, args, options) => {
+    if (cmd === "gh" && args[0] === "api") return { stdout: installations };
     if (cmd === "gh" && args[0] === "variable" && args[1] === "list") {
       if (listFails) return { status: 1, stderr: 'HTTP 403: This API operation needs the "admin:org" scope. To request it, run: gh auth refresh -h github.com -s admin:org' };
       return { stdout: JSON.stringify(variableExists ? [{ name: "BOARD_SYNC_APP_CLIENT_ID" }] : []) };
@@ -128,9 +129,21 @@ test("board-app does nothing when the organisation variable already exists", asy
   const c = ctx();
   const { deps, opened } = harness({ variableExists: true });
   await runBoardApp(c, deps);
-  assert.deepEqual(deps.calls.map(call => call.args), [["variable", "list", "--org", "one-org", "--json", "name"]]);
+  assert.deepEqual(deps.calls.map(call => call.cmd + " " + call.args.slice(0, 2).join(" ")), ["gh variable list", "gh api orgs/one-org/installations"]);
   assert.deepEqual(opened, []);
-  assert.match(deps.logs.join("\n"), /The board-sync App already exists for one-org/);
+  assert.match(deps.logs.join("\n"), /already exists for one-org and covers all repositories/);
+});
+
+test("board-app's existing-App path fails when the App isn't installed", async () => {
+  const { deps, opened } = harness({ variableExists: true, installations: "other-app\tall\n" });
+  await assert.rejects(runBoardApp(ctx(), deps), /isn't installed on one-org: install it with "All repositories"/);
+  assert.deepEqual(opened, []);
+});
+
+test("board-app's existing-App path fails when the installation is on selected repositories", async () => {
+  const { deps } = harness({ variableExists: true, installations: "one-org-board-sync\tselected\n" });
+  await assert.rejects(runBoardApp(ctx(), deps), /must cover all repositories/);
+  assert.match(deps.logs.join("\n"), /Choose All repositories/);
 });
 
 test("board-app through the CLI isn't short-circuited by the empty secrets list", async () => {
