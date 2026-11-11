@@ -23,16 +23,16 @@ export function stubDeps(respond = () => ({ status: 0, stdout: "", stderr: "" })
   };
 }
 
-export function vaultResponder({ slug = "sample-project", items = [] } = {}) {
+export const folder = (id, name, parent = null) => ({ id, share_id: "s", parent_folder_id: parent, content: { name } });
+
+export function vaultResponder({ folders = [], items = [] } = {}) {
   const live = [...items];
-  let created = false;
+  const known = [...folders];
   return (cmd, args, options) => {
     if (cmd !== "pass-cli") return {};
     const key = args.slice(0, 2).join(" ");
-    if (key === "folder list") {
-      return { stdout: JSON.stringify(created ? [{ id: "f1", parent_folder_id: null, content: { name: slug } }] : []) };
-    }
-    if (key === "folder create") created = true;
+    if (key === "folder list") return { stdout: JSON.stringify(known) };
+    if (key === "folder create") known.push(folder("f1", args[args.indexOf("--name") + 1]));
     if (key === "item list") return { stdout: JSON.stringify({ items: live, folders: [] }) };
     if (key === "item create") live.push({ id: `new${live.length}`, title: JSON.parse(options.input).title, folder_id: "f1" });
     return {};

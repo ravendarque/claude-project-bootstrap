@@ -10,32 +10,13 @@ import { consumeHidden } from "../skills/bootstrap/scripts/secrets/deps.mjs";
 import { Vault } from "../skills/bootstrap/scripts/secrets/vault.mjs";
 import { secretExists, setSecret } from "../skills/bootstrap/scripts/secrets/github.mjs";
 import { preflight, runCli, storeThenSet } from "../skills/bootstrap/scripts/secrets.mjs";
-import { projectDir, stubDeps } from "./helpers-secrets.mjs";
+import { folder, projectDir, stubDeps, vaultResponder as passFake } from "./helpers-secrets.mjs";
 
-const folder = (id, name, parent = null) => ({ id, share_id: "s", parent_folder_id: parent, content: { name } });
 const item = (id, title, folder_id = "f1") => ({ id, title, folder_id, state: "active" });
 const isCall = (c, ...words) => c.cmd === "pass-cli" && words.every((w, i) => c.args[i] === w);
 const label = c => `${c.cmd} ${c.args.slice(0, 2).join(" ")}`;
 
-function vaultResponder({ folders = [folder("f1", "sample-project")], items = [] } = {}) {
-  const live = [...items];
-  const known = [...folders];
-  return (cmd, args, options) => {
-    if (cmd !== "pass-cli") return {};
-    const key = args.slice(0, 2).join(" ");
-    if (key === "folder list") return { stdout: JSON.stringify(known) };
-    if (key === "folder create") {
-      known.push(folder("f1", args[args.indexOf("--name") + 1]));
-      return {};
-    }
-    if (key === "item list") return { stdout: JSON.stringify({ items: live, folders: [] }) };
-    if (key === "item create") {
-      live.push(item(`new${live.length}`, JSON.parse(options.input).title));
-      return {};
-    }
-    return {};
-  };
-}
+const vaultResponder = ({ folders = [folder("f1", "sample-project")], items = [] } = {}) => passFake({ folders, items });
 
 const newVault = deps => new Vault(deps, { vault: "Dev", folder: "sample-project" });
 
