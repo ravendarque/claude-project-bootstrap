@@ -9,6 +9,7 @@ import { files, renderReal } from "./helpers.mjs";
 const cf = { zone_name: "example.test" };
 const renders = {
   core: renderReal([]),
+  coreOrg: renderReal([], { owner_type: "Organization" }),
   corePrivate: renderReal([], { visibility: "private" }),
   js: renderReal(["js-toolchain"]),
   web: renderReal(["web-app"]),
@@ -121,6 +122,29 @@ test("the infra plan reads state with read-only credentials", () => {
 
 test("the board sync ignores Dependabot", () => {
   assert.match(read(renders.core, ".github/workflows/project-status-sync.yml"), /github\.actor != 'dependabot\[bot\]'/);
+});
+
+const SYNC = ".github/workflows/project-status-sync.yml";
+
+test("the board sync uses the App's token for an organisation and the PAT for a user", () => {
+  const org = read(renders.coreOrg, SYNC);
+  assert.match(org, /uses: actions\/create-github-app-token@[0-9a-f]{40} # v\d/);
+  assert.match(org, /client-id: \$\{\{ vars\.BOARD_SYNC_APP_CLIENT_ID \}\}/);
+  assert.match(org, /private-key: \$\{\{ secrets\.BOARD_SYNC_APP_PRIVATE_KEY \}\}/);
+  assert.match(org, /owner: \$\{\{ github\.repository_owner \}\}/);
+  assert.match(org, /GH_TOKEN: \$\{\{ steps\.token\.outputs\.token \}\}/);
+  assert.doesNotMatch(org, /PROJECT_STATUS_PAT/);
+  const user = read(renders.core, SYNC);
+  assert.match(user, /GH_TOKEN: \$\{\{ secrets\.PROJECT_STATUS_PAT \}\}/);
+  assert.doesNotMatch(user, /BOARD_SYNC_APP|create-github-app-token/);
+});
+
+test("both board sync variants keep read-only contents and ignore Dependabot", () => {
+  for (const dir of [renders.core, renders.coreOrg]) {
+    const text = read(dir, SYNC);
+    assert.match(text, /permissions:\n  contents: read/);
+    assert.match(text, /github\.actor != 'dependabot\[bot\]'/);
+  }
 });
 
 const SELF_REPOSITORY = /^\$\/[^@\s]+$/;
