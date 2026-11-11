@@ -5,7 +5,7 @@ resource "cloudflare_dns_record" "app_apex" {
   content = "192.0.2.1"
   ttl     = 1
   proxied = true
-  comment = "Placeholder so the hostname reaches the edge and the Worker route answers; traffic never reaches this IP."
+  comment = "Placeholder so the Worker route answers on this hostname; traffic never reaches this IP."
 
   lifecycle {
     prevent_destroy = true
