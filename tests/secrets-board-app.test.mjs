@@ -278,7 +278,7 @@ test("board-app tells you how to recover when Pass fails after the App was creat
   const base = deps.exec;
   deps.exec = async (cmd, args, options) => (cmd === "pass-cli" && args[0] === "item" && args[1] === "create" ? { status: 1, stderr: "pass is down" } : base(cmd, args, options));
   await assert.rejects(runBoardApp(c, deps), error => {
-    assert.match(error.message, /The App one-org-board-sync exists on GitHub but its key wasn't stored \(.*pass is down.*\)\. Delete it at https:\/\/github\.com\/apps\/one-org-board-sync\/advanced, then re-run this step\./);
+    assert.match(error.message, /The App one-org-board-sync exists on GitHub but its key wasn't stored \(.*pass is down.*\)\. Delete it at https:\/\/github\.com\/organizations\/one-org\/settings\/apps\/one-org-board-sync\/advanced, then re-run this step\./);
     assert.ok(error.cause);
     assert.ok(!error.message.includes("PRIVATE KEY"));
     return true;

@@ -189,7 +189,7 @@ test("release-app tells you how to recover when Pass fails after the App was cre
   deps.exec = async (cmd, args, options) => (cmd === "pass-cli" && args[0] === "item" && args[1] === "create" ? { status: 1, stderr: "pass is down" } : base(cmd, args, options));
   const vault = new Vault(deps, { vault: "Dev", folder: c.slug });
   await assert.rejects(releaseApp.run(c, deps, { vault, rotate: false, pollIntervalMs: 1, pollLimitMs: 50 }), error => {
-    assert.match(error.message, /The App sample-project-release exists on GitHub but its key wasn't stored \(.*pass is down.*\)\. Delete it at https:\/\/github\.com\/apps\/sample-project-release\/advanced, then re-run this step\./);
+    assert.match(error.message, /The App sample-project-release exists on GitHub but its key wasn't stored \(.*pass is down.*\)\. Delete it at https:\/\/github\.com\/settings\/apps\/sample-project-release\/advanced, then re-run this step\./);
     assert.ok(error.cause);
     return true;
   });

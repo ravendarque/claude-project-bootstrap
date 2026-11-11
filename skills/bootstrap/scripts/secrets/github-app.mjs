@@ -27,6 +27,11 @@ export function appJwt(clientId, pem, now) {
 
 const escapeHtml = text => text.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 
+export function appSettingsUrl(type, owner, slug) {
+  const settings = type === "Organization" ? `organizations/${encodeURIComponent(owner)}/settings` : "settings";
+  return `https://github.com/${settings}/apps/${encodeURIComponent(slug)}`;
+}
+
 export function newAppUrl(type, owner, state) {
   const settings = type === "Organization" ? `organizations/${encodeURIComponent(owner)}/settings` : "settings";
   return `https://github.com/${settings}/apps/new?state=${encodeURIComponent(state)}`;

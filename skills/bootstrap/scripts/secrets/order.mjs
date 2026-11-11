@@ -1,12 +1,12 @@
 import { resolveEnv } from "./context.mjs";
 import { setOrgSecret, setOrgVariable, setSecret, setVariable } from "./github.mjs";
 
-export async function storeAppThenSet(deps, vault, ctx, app, spec) {
+export async function storeAppThenSet(deps, vault, ctx, app, settingsUrl, spec) {
   try {
     await storeThenSet(deps, vault, ctx, spec);
   } catch (error) {
     if (error.stored) throw error;
-    throw new Error(`The App ${app.slug} exists on GitHub but its key wasn't stored (${error.message}). Delete it at ${app.htmlUrl}/advanced, then re-run this step.`, { cause: error });
+    throw new Error(`The App ${app.slug} exists on GitHub but its key wasn't stored (${error.message}). Delete it at ${settingsUrl}/advanced, then re-run this step.`, { cause: error });
   }
 }
 

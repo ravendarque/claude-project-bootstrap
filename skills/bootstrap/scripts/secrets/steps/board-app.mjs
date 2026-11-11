@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { awaitInstallation, buildManifest, convertManifest, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
+import { appSettingsUrl, awaitInstallation, buildManifest, convertManifest, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
 import { orgVariableExists, setOrgSecret, setOrgVariable } from "../github.mjs";
 import { storeAppThenSet } from "../order.mjs";
 
@@ -73,7 +73,7 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
     },
   });
   const app = await convertManifest(deps, code);
-  await storeAppThenSet(deps, vault, ctx, app, {
+  await storeAppThenSet(deps, vault, ctx, app, appSettingsUrl("Organization", ctx.owner, app.slug), {
     title: TITLE,
     fields: [
       { name: "App id", value: String(app.id), hidden: false },

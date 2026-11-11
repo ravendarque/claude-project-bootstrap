@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { buildManifest, convertManifest, newAppUrl, ownerType, verifyInstallation, waitForCallback } from "../github-app.mjs";
+import { appSettingsUrl, buildManifest, convertManifest, newAppUrl, ownerType, verifyInstallation, waitForCallback } from "../github-app.mjs";
 import { storeAppThenSet } from "../order.mjs";
 
 export { appJwt, buildManifest, newAppUrl, ownerType, waitForCallback } from "../github-app.mjs";
@@ -13,7 +13,8 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
     return;
   }
   const state = randomBytes(16).toString("hex");
-  const actionUrl = newAppUrl(await ownerType(deps, ctx.owner), ctx.owner, state);
+  const type = await ownerType(deps, ctx.owner);
+  const actionUrl = newAppUrl(type, ctx.owner, state);
   const { code } = await waitForCallback(deps, state, {
     manifestFor: redirectUrl => buildManifest({ name: `${ctx.slug}-release`, url: `https://github.com/${ctx.repo}`, permissions: { contents: "write", workflows: "write" } }, redirectUrl),
     actionUrl,
@@ -23,7 +24,7 @@ async function run(ctx, deps, { vault, rotate, pollIntervalMs, pollLimitMs }) {
     },
   });
   const app = await convertManifest(deps, code);
-  await storeAppThenSet(deps, vault, ctx, app, {
+  await storeAppThenSet(deps, vault, ctx, app, appSettingsUrl(type, ctx.owner, app.slug), {
     title: "release App",
     fields: [
       { name: "App id", value: String(app.id), hidden: false },
