@@ -87,13 +87,17 @@ steps count as settled. If the saved answers lack one the interview now asks
      `oneloneraven`), visibility (public or private);
    - the owner's type (`owner_type`): record it from
      `gh api users/<owner> --jq .type`, which prints `User` or
-     `Organization`;
+     `Organization`. For an organisation, check that `gh auth status` lists
+     the `admin:org` scope, because the board-sync App's organisation
+     secret and variable need it. If it's missing, ask the user to run
+     `gh auth refresh -h github.com -s admin:org`;
    - for a private repo only, the owner's GitHub plan (`github_plan`: `free`,
      `pro`, `team` or `enterprise`). First try
      `gh api user --jq '.plan.name // empty'` for a personal owner, or
      `gh api orgs/<owner> --jq '.plan.name // empty'` for an organisation
-     owner: the API returns `plan` only to
-     a token with the `user` scope, so a typical token prints nothing. If it
+     owner. The user endpoint returns `plan` only to a token with the `user`
+     scope, and the organisation endpoint only to an organisation admin, so
+     the command may print nothing. If it
      prints a plan, record it lower-cased. If it prints nothing, say the token
      can't read the plan and ask which plan the owner is on. Public repos get
      these features on every plan: don't ask and record no plan;
