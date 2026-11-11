@@ -15,6 +15,16 @@ function exec(cmd, args, { input, env } = {}) {
   });
 }
 
+export function consumeHidden(answer, chunk) {
+  for (const char of chunk) {
+    if (char === "\r" || char === "\n") return { answer, done: "enter" };
+    if (char === "\u0003") return { answer, done: "cancel" };
+    if (char === "\u0004") return { answer, done: answer ? "enter" : "cancel" };
+    answer = char === "\u007f" || char === "\b" ? answer.slice(0, -1) : answer + char;
+  }
+  return { answer, done: null };
+}
+
 function hiddenPrompt(question) {
   return new Promise((resolve, reject) => {
     const { stdin, stdout } = process;
@@ -35,12 +45,10 @@ function hiddenPrompt(question) {
       outcome();
     };
     const onData = chunk => {
-      for (const char of chunk) {
-        if (char === "\r" || char === "\n") return finish(() => resolve(answer));
-        if (char === "\u0003") return finish(() => reject(new Error("Cancelled")));
-        if (char === "\u007f" || char === "\b") answer = answer.slice(0, -1);
-        else answer += char;
-      }
+      const next = consumeHidden(answer, chunk);
+      answer = next.answer;
+      if (next.done === "enter") finish(() => resolve(answer));
+      else if (next.done === "cancel") finish(() => reject(new Error("Cancelled")));
     };
     stdin.on("data", onData);
   });

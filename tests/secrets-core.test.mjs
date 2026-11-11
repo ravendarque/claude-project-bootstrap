@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadContext, resolveEnv } from "../skills/bootstrap/scripts/secrets/context.mjs";
+import { consumeHidden } from "../skills/bootstrap/scripts/secrets/deps.mjs";
 import { Vault } from "../skills/bootstrap/scripts/secrets/vault.mjs";
 import { secretExists, setSecret } from "../skills/bootstrap/scripts/secrets/github.mjs";
 import { preflight, runCli, storeThenSet } from "../skills/bootstrap/scripts/secrets.mjs";
@@ -258,4 +259,17 @@ test("the script runs when launched through a symlinked directory", () => {
   const result = spawnSync(process.execPath, [join(link, "secrets.mjs")], { encoding: "utf8" });
   assert.equal(result.status, 2);
   assert.match(result.stdout, /Usage: secrets\.mjs/);
+});
+
+test("the hidden prompt takes a pasted line ending as one Enter and ignores the rest of the chunk", () => {
+  assert.deepEqual(consumeHidden("", "abc\r\n"), { answer: "abc", done: "enter" });
+  assert.deepEqual(consumeHidden("", "abc\ndef"), { answer: "abc", done: "enter" });
+  assert.deepEqual(consumeHidden("ab", "c"), { answer: "abc", done: null });
+});
+
+test("the hidden prompt handles backspace, Ctrl-C and Ctrl-D", () => {
+  assert.deepEqual(consumeHidden("", "ab\u007fc"), { answer: "ac", done: null });
+  assert.deepEqual(consumeHidden("abc", "\u0003"), { answer: "abc", done: "cancel" });
+  assert.deepEqual(consumeHidden("abc", "\u0004"), { answer: "abc", done: "enter" });
+  assert.deepEqual(consumeHidden("", "\u0004"), { answer: "", done: "cancel" });
 });
