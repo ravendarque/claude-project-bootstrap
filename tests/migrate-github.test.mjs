@@ -156,3 +156,12 @@ test("connection retries and rate-limit retries are counted separately", async (
   assert.ok(await gh.repository("alice", "widgets"));
   assert.equal(fake.sleeps.length, 5);
 });
+
+test("a validation failure includes GitHub's error details", async () => {
+  const gh = createGithub({
+    exec: async () => ({ status: 1, stdout: 'HTTP/2.0 422 Unprocessable Entity\r\n\r\n{"message":"Validation Failed","errors":["This organization does not have GitHub Pages enabled.",{"message":"Second reason"}]}', stderr: "gh: Validation Failed (HTTP 422)" }),
+    sleep: async () => {},
+    log: () => {},
+  });
+  await assert.rejects(gh.transfer("alice", "widgets", "acme"), error => error.message === "gh api POST repos/alice/widgets/transfer failed (HTTP 422): Validation Failed: This organization does not have GitHub Pages enabled.; Second reason");
+});

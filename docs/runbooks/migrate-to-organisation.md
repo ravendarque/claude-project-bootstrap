@@ -186,5 +186,6 @@ The script ends by listing what's left. Typically:
 
 ## After the last repository
 
-Delete the personal account's `Project template` (see the
+The personal account's `Project template` was deleted on 2026-11-12. A
+personal-owner bootstrap now needs one created first (see the
 [board template runbook](board-template.md)).

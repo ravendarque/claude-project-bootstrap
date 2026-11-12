@@ -571,3 +571,64 @@ test("link stops when the moved repository can't be found", async () => {
   assert.match(fake.logs.join("\n"), /acme\/widgets wasn't found, so it can't be linked to the new board/);
   assert.equal(fake.mutations.includes("LinkRepo"), false);
 });
+
+test("a repository renamed before the run is followed under its new name", async () => {
+  const { fake, dir, go, repo } = setup();
+  fake.rename("alice/widgets", "gadgets");
+  const dirProject = projectDir();
+  assert.equal(await go(scriptedAnswers(fake, "Widgets", "gadgets"), [...ARGV, "--project-dir", dirProject]), 0, fake.logs.join("\n"));
+  const post = fake.calls.find(call => call.args.includes("POST"));
+  assert.equal(post.args[post.args.indexOf("-X") + 2], "repos/alice/gadgets/transfer");
+  assert.ok(fake.repos.has("acme/gadgets"));
+  assert.equal(openState(dir, "widgets").data.newName, "gadgets");
+  assert.equal(repo.variables.get("PROJECT_ID"), newBoard(fake).id);
+  assert.ok(fake.repos.get("acme/gadgets").linked.includes(newBoard(fake).id));
+  assert.equal(repo.secrets.has("PROJECT_STATUS_PAT"), false);
+  assert.equal(repo.secrets.has("RELEASE_APP_PRIVATE_KEY"), true);
+  assert.equal(readJson(dirProject, "state.json").answers.slug, "gadgets");
+  assert.match(fake.logs.join("\n"), /Migration of widgets \(now gadgets\) is complete/);
+});
+
+test("a rename during the transfer is followed through the old name's redirect", async () => {
+  const { fake, dir, go, repo } = setup();
+  fake.transferRename = "gadgets";
+  assert.equal(await go(scriptedAnswers(fake, "Widgets", "gadgets")), 0, fake.logs.join("\n"));
+  assert.ok(fake.repos.has("acme/gadgets"));
+  assert.equal(openState(dir, "widgets").data.newName, "gadgets");
+  assert.match(fake.logs.join("\n"), /The repository is now acme\/gadgets, not widgets/);
+  assert.equal(repo.variables.get("PROJECT_ID"), newBoard(fake).id);
+  assert.ok(fake.mutations.includes("variable set PROJECT_ID"));
+  assert.equal(repo.secrets.has("PROJECT_STATUS_PAT"), false);
+  assert.ok(repo.secrets.has("RELEASE_APP_PRIVATE_KEY"));
+});
+
+test("a resume after the repository has landed under a new name skips the transfer", async () => {
+  const { fake, go } = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+  fake.transferRename = "gadgets";
+  fake.transferPolls = 1000;
+  assert.equal(await go(), 1);
+  assert.match(fake.logs.join("\n"), /didn't appear within 2 minutes/);
+  fake.pending.polls = 0;
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  assert.equal(fake.mutations.filter(label => label === "transfer").length, 1);
+  assert.match(fake.logs.join("\n"), /The repository is now acme\/gadgets/);
+});
+
+test("the report only mentions Pages if it's still enabled, with the current domain", async () => {
+  const live = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+  let reads = 0;
+  live.fake.hooks.pages = repo => {
+    if (++reads > 1) repo.pages = { html_url: "https://new.example.com/", cname: "new.example.com" };
+  };
+  assert.equal(await live.go(), 0, live.fake.logs.join("\n"));
+  assert.match(live.fake.logs.join("\n"), /Pages: check the custom domain on acme\/widgets \(new\.example\.com\)/);
+  assert.doesNotMatch(live.fake.logs.join("\n"), /widgets\.example\.com\)/);
+
+  const gone = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+  let seen = 0;
+  gone.fake.hooks.pages = repo => {
+    if (++seen > 1) repo.pages = null;
+  };
+  assert.equal(await gone.go(), 0, gone.fake.logs.join("\n"));
+  assert.doesNotMatch(gone.fake.logs.join("\n"), /Pages: check/);
+});

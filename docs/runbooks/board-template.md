@@ -53,7 +53,8 @@ All of these are enabled:
 
 If the owner's account has no `Project template`, create one:
 
-1. Copy a board that's already set up like this one, with GraphQL's
+1. Copy a board that's already set up like this one (for a personal
+   account, the organisation template), with GraphQL's
    `copyProjectV2` (`includeDraftIssues: false`), and title the copy
    `Project template`.
 2. Check that it's private and has no items.
@@ -84,9 +85,16 @@ The API reports which workflows are enabled, but not their settings.
   organisation-owned projects. It was copied from the personal template on
   2026-11-11, and the copy matched every field, view, sort and enabled
   workflow.
-- **The personal account, project 9:** the template for personal-owner
-  bootstraps. It stays until the migration to the organisation (#75) is
-  finished, and is deleted after that.
+
+Only the organisation template exists. The personal account's
+`Project template` (project 9) was deleted on 2026-11-12, after the
+migration to the organisation (#75). A personal-owner bootstrap needs one
+created first, by following "Creating it": copy the organisation template
+to the personal account with `copyProjectV2` (`includeDraftIssues: false`,
+the organisation template's id as `projectId`, the personal account's id as
+`ownerId`), title the copy `Project template`, and make it private.
+Without one, the bootstrap offers the "Without the template" fallback at
+the plan.
 
 Last checked on 2026-11-08: a copy kept every field, view, sort and
 workflow, including Auto-archive. It had no Auto-add, and listed Epics

@@ -52,7 +52,17 @@ async function waitFor(deps, question, accept = typedDone) {
   throw new Error("No confirmation received: re-run to resume from this phase");
 }
 
-const slug = ctx => `${ctx.org}/${ctx.repo}`;
+const sourceName = ctx => ctx.store.data.sourceName ?? ctx.repo;
+const targetName = ctx => ctx.store.data.newName ?? ctx.repo;
+const slug = ctx => `${ctx.org}/${targetName(ctx)}`;
+const sameOwner = (a, b) => a.toLowerCase() === b.toLowerCase();
+
+async function locate(gh, owner, name) {
+  const found = await gh.repository(owner, name);
+  if (!found) return null;
+  const [foundOwner, foundName] = (found.full_name ?? `${owner}/${name}`).split("/");
+  return { owner: foundOwner, name: foundName, nodeId: found.node_id };
+}
 const boardUrl = (ctx, board) => `https://github.com/orgs/${ctx.org}/projects/${board.number}`;
 
 function countsOf(items) {
@@ -65,8 +75,8 @@ function countsOf(items) {
 }
 
 function printPlan(ctx, inventory) {
-  const { deps, login, org, repo } = ctx;
-  deps.log(`Plan: move ${login}/${repo} to ${org}/${repo}`);
+  const { deps, login, org } = ctx;
+  deps.log(`Plan: move ${login}/${sourceName(ctx)} to ${org}/${sourceName(ctx)}`);
   if (inventory.board) {
     const { board } = inventory;
     const { counts } = board;
@@ -89,7 +99,7 @@ function projectAnswers(ctx) {
   const file = join(ctx.projectDir, ".bootstrap", "state.json");
   if (!existsSync(file)) return null;
   const state = loadState(ctx.projectDir);
-  if (state.answers?.slug !== ctx.repo) {
+  if (![ctx.repo, sourceName(ctx), targetName(ctx)].includes(state.answers?.slug)) {
     throw new Error(`${ctx.projectDir} is the project "${state.answers?.slug ?? "unknown"}", not ${ctx.repo}: pass the right --project-dir`);
   }
   return state;
@@ -112,7 +122,8 @@ function excludeBootstrap(projectDir) {
 }
 
 function createBootstrapState(ctx) {
-  const { deps, store, org, repo, projectDir } = ctx;
+  const { deps, store, org, projectDir } = ctx;
+  const repo = targetName(ctx);
   if (!store.data.inventory.releaseApp) return deps.log(`${projectDir} has no .bootstrap/state.json, and ${repo} has no release App, so nothing is needed`);
   const name = store.data.inventory.board?.title ?? repo;
   saveRun(projectDir, { answers: { owner: org, owner_type: "Organization", slug: repo, name }, modules: [] });
@@ -131,7 +142,7 @@ async function bootstrapAnswersPhase(ctx) {
   if (!projectDir) return deps.log("No --project-dir given, so the project's bootstrap answers are unchanged");
   const state = projectAnswers(ctx);
   if (!state) return createBootstrapState(ctx);
-  const wanted = { owner: org, owner_type: "Organization" };
+  const wanted = { owner: org, owner_type: "Organization", slug: targetName(ctx) };
   const matches = values => Object.entries(wanted).every(([key, value]) => values[key] === value);
   if (matches(state.answers)) deps.log("The project's bootstrap state already names the organisation");
   else saveRun(projectDir, { answers: { ...state.answers, ...wanted }, modules: state.modules });
@@ -150,11 +161,19 @@ async function inventory(ctx) {
     printPlan(ctx, store.data.inventory);
     return;
   }
-  if (!(await gh.repository(login, repo))) throw new Error(`${login}/${repo} doesn't exist, so there's nothing to move`);
-  if (await gh.repository(org, repo)) throw new Error(`${org} already has a repository named ${repo}: resolve that before migrating`);
-  const linked = await linkedBoards(gh, login, repo);
+  const found = await locate(gh, login, repo);
+  if (!found) throw new Error(`${login}/${repo} doesn't exist, so there's nothing to move`);
+  if (sameOwner(found.owner, org)) throw new Error(`${org} already has a repository named ${found.name}: resolve that before migrating`);
+  if (!sameOwner(found.owner, login)) throw new Error(`${repo} now belongs to ${found.owner}, not ${login}: sign in as its owner`);
+  const source = found.name;
+  if (source !== repo) deps.log(`${login}/${repo} has been renamed to ${source}: carrying on under that name`);
+  for (const name of new Set([repo, source])) {
+    if (await gh.repository(org, name)) throw new Error(`${org} already has a repository named ${name}: resolve that before migrating`);
+  }
+  store.data.sourceName = source;
+  const linked = await linkedBoards(gh, login, source);
   if (linked.length > 1) {
-    throw new Error(`${login}/${repo} is linked to ${linked.length} boards (${linked.map(entry => entry.title).join(", ")}): unlink all but one, then re-run`);
+    throw new Error(`${login}/${source} is linked to ${linked.length} boards (${linked.map(entry => entry.title).join(", ")}): unlink all but one, then re-run`);
   }
   if (ctx.projectDir) projectAnswers(ctx);
   let board = null;
@@ -162,13 +181,13 @@ async function inventory(ctx) {
   if (linked.length === 1) {
     const meta = await readBoard(gh, linked[0].id);
     const items = await readItems(gh, meta.id);
-    otherRepos = [...new Set(items.filter(isCopyable).map(item => item.repository).filter(name => name && name.toLowerCase() !== `${login}/${repo}`.toLowerCase()))];
+    otherRepos = [...new Set(items.filter(isCopyable).map(item => item.repository).filter(name => name && name.toLowerCase() !== `${login}/${source}`.toLowerCase()))];
     board = { id: meta.id, number: meta.number, title: meta.title, fields: meta.fields.map(({ name, dataType, options }) => ({ name, dataType, options: options.map(option => option.name) })), counts: countsOf(items) };
   }
-  const secrets = await gh.secretNames(`${login}/${repo}`);
-  const variables = await gh.variableNames(`${login}/${repo}`);
-  const pages = await gh.pages(login, repo);
-  const packages = await gh.npmPackages(repo).catch(() => null);
+  const secrets = await gh.secretNames(`${login}/${source}`);
+  const variables = await gh.variableNames(`${login}/${source}`);
+  const pages = await gh.pages(login, source);
+  const packages = await gh.npmPackages(source).catch(() => null);
   store.data.inventory = {
     board,
     otherRepos,
@@ -177,22 +196,35 @@ async function inventory(ctx) {
     pages: pages ? { url: pages.html_url ?? null, cname: pages.cname ?? null } : null,
     packages,
     releaseApp: secrets.includes(RELEASE_SECRET),
-    syncWorkflow: await gh.fileExists(login, repo, SYNC_WORKFLOW),
+    syncWorkflow: await gh.fileExists(login, source, SYNC_WORKFLOW),
   };
   printPlan(ctx, store.data.inventory);
 }
 
 async function transfer(ctx) {
-  const { gh, deps, login, org, repo } = ctx;
-  if (!(await gh.repository(org, repo))) await gh.transfer(login, repo, org);
-  for (let waited = 0; waited <= TRANSFER_LIMIT_MS; waited += TRANSFER_POLL_MS) {
-    if (await gh.repository(org, repo)) {
-      deps.log(`${slug(ctx)} is now in the organisation`);
-      return;
+  const { gh, deps, store, login, org, repo } = ctx;
+  const source = sourceName(ctx);
+  const landed = async () => {
+    for (const owner of [org, login]) {
+      const found = await locate(gh, owner, source);
+      if (found && sameOwner(found.owner, org)) return found;
     }
+    return null;
+  };
+  let found = await landed();
+  if (!found) await gh.transfer(login, source, org);
+  for (let waited = 0; waited <= TRANSFER_LIMIT_MS; waited += TRANSFER_POLL_MS) {
+    found ??= await landed();
+    if (found) break;
     await deps.sleep(TRANSFER_POLL_MS);
   }
-  throw new Error(`${slug(ctx)} didn't appear within 2 minutes of the transfer: check GitHub, then re-run`);
+  if (!found) throw new Error(`${org}/${source} didn't appear within 2 minutes of the transfer: check GitHub, then re-run`);
+  if (found.name !== repo) {
+    store.data.newName = found.name;
+    store.save();
+    deps.log(`The repository is now ${org}/${found.name}, not ${repo}: the later phases use that name`);
+  }
+  deps.log(`${slug(ctx)} is now in the organisation`);
 }
 
 function checkFieldsCopied(oldBoard, newBoard) {
@@ -359,7 +391,7 @@ async function linkOtherRepositories(ctx, variables) {
 }
 
 async function linkPhase(ctx) {
-  const { gh, deps, store, org, repo } = ctx;
+  const { gh, deps, store, org } = ctx;
   const { newBoard } = store.data;
   if (!newBoard) return deps.log("No board to link");
   const status = newBoard.fields.find(field => sameName(field.name, "Status") && field.options.length);
@@ -375,7 +407,7 @@ async function linkPhase(ctx) {
     PROJECT_IN_PROGRESS_OPTION: option("In progress"),
     PROJECT_IN_REVIEW_OPTION: option("In review"),
   };
-  if (!(await pointAtBoard(ctx, org, repo, variables))) throw new Error(`${slug(ctx)} wasn't found, so it can't be linked to the new board: check the transfer, then re-run`);
+  if (!(await pointAtBoard(ctx, org, targetName(ctx), variables))) throw new Error(`${slug(ctx)} wasn't found, so it can't be linked to the new board: check the transfer, then re-run`);
   await linkOtherRepositories(ctx, variables);
   for (let attempt = 1; ; attempt += 1) {
     await waitFor(deps, `Open ${boardUrl(ctx, newBoard)}/workflows, turn on Auto-add for ${slug(ctx)} with the filter is:issue, then type done: `);
@@ -387,7 +419,8 @@ async function linkPhase(ctx) {
 }
 
 async function boardSyncPhase(ctx) {
-  const { gh, deps, repo, org } = ctx;
+  const { gh, deps, org } = ctx;
+  const repo = targetName(ctx);
   if (!ctx.store.data.inventory.syncWorkflow) return deps.log(`${repo} has no ${SYNC_WORKFLOW}, so there's nothing to switch`);
   deps.log(`${slug(ctx)} needs the App variant of board sync, from ${SYNC_TEMPLATE}. Put it in through that repository's own PR process.`);
   for (let attempt = 1; ; attempt += 1) {
@@ -468,16 +501,20 @@ export const PHASES = [
   { name: "delete-old-board", run: deleteOldBoardPhase },
 ];
 
-function report(ctx) {
-  const { deps, store } = ctx;
+async function report(ctx) {
+  const { deps, store, gh } = ctx;
   const { inventory: found, notes } = store.data;
   const left = [...notes];
   if (found.releaseApp && !ownerNamed(ctx)) left.push(`The project's .bootstrap owner must be changed to ${ctx.org} (owner_type Organization) before release-app: re-run with --project-dir, or edit state.json and answers.json by hand`);
-  if (found.pages) left.push(`Pages: check the custom domain on ${slug(ctx)} (${found.pages.cname ?? found.pages.url}) and that the site still answers`);
+  if (found.pages) {
+    const pages = await gh.pages(ctx.org, targetName(ctx)).catch(() => undefined);
+    if (pages === undefined) left.push(`Pages couldn't be re-checked: check the custom domain on ${slug(ctx)} and that the site still answers`);
+    else if (pages) left.push(`Pages: check the custom domain on ${slug(ctx)} (${pages.cname ?? pages.html_url}) and that the site still answers`);
+  }
   if (found.packages?.length) left.push(`Packages ${found.packages.join(", ")} need a new scope and a republish, from the repository`);
   if (found.packages === null) left.push("Packages couldn't be listed: check for npm packages that need a new scope");
   if (left.length) deps.log(`Still to do by hand:\n${left.map(line => `- ${line}`).join("\n")}`);
-  deps.log(`Migration of ${ctx.repo} is complete`);
+  deps.log(`Migration of ${ctx.repo}${targetName(ctx) === ctx.repo ? "" : ` (now ${targetName(ctx)})`} is complete`);
 }
 
 export async function runMigration(ctx) {
@@ -491,5 +528,5 @@ export async function runMigration(ctx) {
     await phase.run(ctx);
     if (!ctx.dry) ctx.store.markDone(phase.name);
   }
-  if (!ctx.dry) report(ctx);
+  if (!ctx.dry) await report(ctx);
 }

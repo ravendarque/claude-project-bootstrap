@@ -34,6 +34,8 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     crash: null,
     hooks: {},
     transferPolls: 2,
+    renames: new Map(),
+    transferRename: null,
     late: [],
   };
   const numbers = new Map();
@@ -231,29 +233,34 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     const [route] = path.split("?");
     const repoMatch = /^repos\/([^/]+)\/([^/]+)(?:\/(.*))?$/.exec(route);
     if (method === "GET" && repoMatch && !repoMatch[3]) {
-      const key = `${repoMatch[1]}/${repoMatch[2]}`;
+      const asked = `${repoMatch[1]}/${repoMatch[2]}`;
+      const key = world.repos.has(asked) ? asked : (world.renames.get(asked) ?? asked);
       if (world.pending?.key === key) {
         if (world.pending.polls-- > 0) return reply(404, { message: "Not Found" });
         world.pending = null;
       }
       const repo = world.hooks.repositoryRead?.(key) === false ? null : world.repos.get(key);
-      return repo ? reply(200, { node_id: repo.node_id, html_url: `https://github.com/${key}` }) : reply(404, { message: "Not Found" });
+      return repo ? reply(200, { node_id: repo.node_id, full_name: key, html_url: `https://github.com/${key}` }) : reply(404, { message: "Not Found" });
     }
     if (method === "POST" && repoMatch?.[3] === "transfer") {
       mutate("transfer");
       const from = `${repoMatch[1]}/${repoMatch[2]}`;
       const repo = world.repos.get(from);
+      if (!repo) return reply(404, { message: "Not Found" });
+      const to = `${world.org}/${world.transferRename ?? repoMatch[2]}`;
       world.repos.delete(from);
       repo.owner = world.org;
       repo.linked = [];
-      for (const content of world.contents.values()) if (content.repo === from) content.repo = `${world.org}/${repoMatch[2]}`;
-      world.repos.set(`${world.org}/${repoMatch[2]}`, repo);
-      world.pending = { key: `${world.org}/${repoMatch[2]}`, polls: world.transferPolls };
+      for (const content of world.contents.values()) if (content.repo === from) content.repo = to;
+      world.repos.set(to, repo);
+      world.renames.set(from, to);
+      world.pending = { key: to, polls: world.transferPolls };
       return reply(202, {});
     }
     if (method === "GET" && repoMatch?.[3] === "pages") {
       const repo = world.repos.get(`${repoMatch[1]}/${repoMatch[2]}`);
-      return repo.pages ? reply(200, repo.pages) : reply(404, { message: "Not Found" });
+      world.hooks.pages?.(repo);
+      return repo?.pages ? reply(200, repo.pages) : reply(404, { message: "Not Found" });
     }
     if (method === "GET" && repoMatch?.[3]?.startsWith("contents/")) {
       const repo = world.repos.get(`${repoMatch[1]}/${repoMatch[2]}`);
@@ -326,7 +333,16 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     throw new Error(`fake pass-cli: ${args.join(" ")} must not be called`);
   }
 
-  return Object.assign(world, { exec, addRepo, addProject, addContent, addItem, urlOf, itemNode });
+  function rename(oldKey, newName) {
+    const repo = world.repos.get(oldKey);
+    const newKey = `${repo.owner}/${newName}`;
+    world.repos.delete(oldKey);
+    world.repos.set(newKey, repo);
+    world.renames.set(oldKey, newKey);
+    for (const content of world.contents.values()) if (content.repo === oldKey) content.repo = newKey;
+  }
+
+  return Object.assign(world, { rename, exec, addRepo, addProject, addContent, addItem, urlOf, itemNode });
 }
 
 export function seedWorld(fake, { releaseApp = true, syncWorkflow = true, withBoard = true, passFolder = true } = {}) {
@@ -389,14 +405,14 @@ export function migrationDeps(fake, answers = () => "done") {
   };
 }
 
-export function scriptedAnswers(fake, title = "Widgets") {
+export function scriptedAnswers(fake, title = "Widgets", name = "widgets") {
   return question => {
     if (/Auto-add/.test(question)) {
       for (const project of fake.projects.values()) if (project.owner === fake.org) project.workflows.find(w => w.name === "Auto-add to project").enabled = true;
     }
-    if (/App variant/.test(question)) fake.repos.get(`${fake.org}/widgets`).files.set(".github/workflows/project-status-sync.yml", "uses: actions/create-github-app-token@v1");
+    if (/App variant/.test(question)) fake.repos.get(`${fake.org}/${name}`).files.set(".github/workflows/project-status-sync.yml", "uses: actions/create-github-app-token@v1");
     if (/new release App/.test(question)) {
-      const repo = fake.repos.get(`${fake.org}/widgets`);
+      const repo = fake.repos.get(`${fake.org}/${name}`);
       repo.secrets.add("RELEASE_APP_PRIVATE_KEY");
       repo.variables.set("RELEASE_APP_CLIENT_ID", "Iv1.new");
     }
