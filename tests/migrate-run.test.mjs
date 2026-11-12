@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
+import { openState } from "../skills/bootstrap/scripts/migrate/state.mjs";
 import { runCli } from "../skills/bootstrap/scripts/migrate.mjs";
 import { createFake, migrationDeps, scriptedAnswers, seedWorld, stateDir, summarise } from "./helpers-migrate.mjs";
 
@@ -251,4 +252,41 @@ test("it refuses to run as the organisation itself", async () => {
   seedWorld(fake);
   assert.equal(await runCli(ARGV, migrationDeps(fake), { stateDir: stateDir() }), 1);
   assert.match(fake.logs.join("\n"), /signed in as acme, the target organisation/);
+});
+
+test("verify unarchives an item a board workflow archived that the old board kept active", async () => {
+  const { fake, go, board } = setup();
+  const target = board.items.find(item => item.values.Status?.value === "Todo" && item.contentId);
+  fake.hooks.afterSet = (project, item, field) => {
+    if (project.owner === "acme" && field === "Status" && item.contentId === target.contentId) item.isArchived = true;
+  };
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  assert.ok(fake.mutations.includes("UnarchiveItem"));
+  assert.equal(newBoard(fake).items.find(item => item.contentId === target.contentId).isArchived, false);
+});
+
+test("verify clears a value a board workflow set where the old item had none", async () => {
+  const { fake, go, board } = setup();
+  const contentId = fake.addContent("alice/widgets");
+  fake.addItem(board, { contentId, values: { Priority: { type: "single", value: "P0" } } });
+  fake.hooks.afterAdd = (project, item) => {
+    if (project.owner === "acme" && item.contentId === contentId) item.values.Status = { type: "single", value: "Todo" };
+  };
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  assert.match(fake.logs.join("\n"), /Verify pass 1/);
+  assert.ok(fake.mutations.includes("ClearValue"));
+  const item = newBoard(fake).items.find(entry => entry.contentId === contentId);
+  assert.deepEqual(item.values, { Priority: { type: "single", value: "P0" } });
+});
+
+test("the link phase can be run twice without a second link or an error", async () => {
+  const { fake, dir, go } = setup();
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  const state = openState(dir, "widgets");
+  delete state.data.phases.link;
+  state.save();
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  assert.equal(fake.logs.filter(line => line === "Phase link").length, 2);
+  assert.equal(fake.mutations.filter(label => label === "LinkRepo").length, 1);
+  assert.equal(fake.repos.get("acme/widgets").linked.length, 1);
 });

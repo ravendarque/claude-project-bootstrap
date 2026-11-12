@@ -18,6 +18,8 @@ import {
   readBoard,
   readItems,
   setValue,
+  unarchiveItem,
+  clearValue,
 } from "./board.mjs";
 
 const SYNC_WORKFLOW = ".github/workflows/project-status-sync.yml";
@@ -212,12 +214,15 @@ async function repair(ctx, issue, oldByUrl, newByUrl) {
     await placeItem(ctx, old, entry);
   } else if (issue.kind === "value") {
     await setValue(gh, board, newByUrl.get(issue.url).id, issue.field, issue.expected);
-  } else if (issue.kind === "archived" && issue.expected) {
-    await archiveItem(gh, board.id, newByUrl.get(issue.url).id);
+  } else if (issue.kind === "extra") {
+    await clearValue(gh, board, newByUrl.get(issue.url).id, issue.field);
+  } else if (issue.kind === "archived") {
+    const { id } = newByUrl.get(issue.url);
+    await (issue.expected ? archiveItem(gh, board.id, id) : unarchiveItem(gh, board.id, id));
   }
 }
 
-const fixable = issue => issue.kind === "missing" || issue.kind === "value" || (issue.kind === "archived" && issue.expected);
+const fixable = issue => ["missing", "value", "extra", "archived"].includes(issue.kind);
 
 async function verifyPhase(ctx) {
   const { gh, deps, store } = ctx;
@@ -226,10 +231,10 @@ async function verifyPhase(ctx) {
   const check = async () => {
     const oldItems = await readItems(gh, data.inventory.board.id);
     const newItems = await readItems(gh, data.newBoard.id);
-    const { issues, extras } = compareBoards(oldItems, newItems);
+    const { issues } = compareBoards(oldItems, newItems);
     const drafts = { old: countDrafts(oldItems), found: countDrafts(newItems) };
     if (drafts.old !== drafts.found) issues.push({ kind: "drafts", ...drafts });
-    return { issues, extras, oldItems, newItems };
+    return { issues, oldItems, newItems };
   };
   let result = await check();
   let passes = 0;
@@ -241,7 +246,6 @@ async function verifyPhase(ctx) {
     for (const issue of result.issues.filter(fixable)) await repair(ctx, issue, oldByUrl, newByUrl);
     result = await check();
   }
-  if (result.extras) store.note(`${result.extras} values on the new board have no counterpart on the old one, probably from a board workflow: check them`);
   if (result.issues.length) {
     data.verify = { passed: false, passes, remaining: result.issues.slice(0, 20).map(describeIssue) };
     store.save();
@@ -260,7 +264,7 @@ async function linkPhase(ctx) {
   const { newBoard } = data;
   if (!newBoard) return deps.log("No board to link");
   const target = await gh.repository(org, repo);
-  await linkRepository(gh, newBoard.id, target.node_id);
+  if (!(await linkedBoards(gh, org, repo)).some(entry => entry.id === newBoard.id)) await linkRepository(gh, newBoard.id, target.node_id);
   const status = newBoard.fields.find(field => sameName(field.name, "Status") && field.options.length);
   if (!status) throw new Error("The new board has no Status field with options, so the board sync variables can't be set");
   const option = name => {

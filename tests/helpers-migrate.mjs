@@ -174,6 +174,17 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
         world.projects.get(v.input.projectId).items.find(item => item.id === v.input.itemId).isArchived = true;
         return { archiveProjectV2Item: { item: { id: v.input.itemId } } };
       }
+      case "UnarchiveItem":
+        mutate("UnarchiveItem");
+        world.projects.get(v.input.projectId).items.find(item => item.id === v.input.itemId).isArchived = false;
+        return { unarchiveProjectV2Item: { item: { id: v.input.itemId } } };
+      case "ClearValue": {
+        mutate("ClearValue");
+        const project = world.projects.get(v.input.projectId);
+        const field = project.fields.find(entry => entry.id === v.input.fieldId);
+        delete project.items.find(item => item.id === v.input.itemId).values[field.name];
+        return { clearProjectV2ItemFieldValue: { projectV2Item: { id: v.input.itemId } } };
+      }
       case "LinkRepo": {
         mutate("LinkRepo");
         const repo = [...world.repos.values()].find(entry => entry.node_id === v.input.repositoryId);
