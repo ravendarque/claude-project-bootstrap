@@ -83,7 +83,8 @@ export function createGithub(deps) {
   }
 
   const fail = (what, response) => {
-    const error = new Error(`gh ${what} failed (HTTP ${response.status}): ${messageOf(response)}`);
+    const details = (Array.isArray(response.body?.errors) ? response.body.errors : []).map(entry => (typeof entry === "string" ? entry : entry?.message)).filter(Boolean);
+    const error = new Error(`gh ${what} failed (HTTP ${response.status}): ${messageOf(response)}${details.length ? `: ${details.join("; ")}` : ""}`);
     error.status = response.status;
     return error;
   };
