@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createGithub } from "../skills/bootstrap/scripts/migrate/github.mjs";
+import { readItems } from "../skills/bootstrap/scripts/migrate/board.mjs";
 import { openState } from "../skills/bootstrap/scripts/migrate/state.mjs";
 import { runCli } from "../skills/bootstrap/scripts/migrate.mjs";
 import { createFake, migrationDeps, scriptedAnswers, seedWorld, stateDir, summarise } from "./helpers-migrate.mjs";
@@ -337,4 +342,137 @@ test("release-app doesn't create a Pass folder, and says when no old item was fo
   assert.equal(fake.calls.some(call => call.cmd === "pass-cli" && call.args[1] === "create"), false);
   assert.match(fake.logs.join("\n"), /No old release App item was found in Dev\/widgets/);
   assert.deepEqual(fake.trashed, []);
+});
+
+function projectDir(answers = { slug: "widgets", owner: "alice", owner_type: "User" }) {
+  const dir = mkdtempSync(join(tmpdir(), "project-"));
+  mkdirSync(join(dir, ".bootstrap"));
+  writeFileSync(join(dir, ".bootstrap", "state.json"), JSON.stringify({ steps: {}, answers, modules: ["core"], ids: {}, skipped: {} }));
+  writeFileSync(join(dir, ".bootstrap", "answers.json"), JSON.stringify({ ...answers, name: "Widgets" }));
+  return dir;
+}
+
+const readJson = (dir, name) => JSON.parse(readFileSync(join(dir, ".bootstrap", name), "utf8"));
+
+test("only single-select, number, text, date and iteration values are read, decided by data type", async () => {
+  const { fake, board } = setup();
+  const items = await readItems(createGithub(migrationDeps(fake)), board.id);
+  for (const item of items) for (const name of Object.keys(item.values)) assert.ok(["Status", "Priority", "Estimate", "Notes", "Due", "Sprint"].includes(name), name);
+  assert.equal(items.some(item => "Title" in item.values || "Created" in item.values || "Closed" in item.values || "Updated" in item.values), false);
+});
+
+test("built-in Title, Created, Closed and Updated values are neither copied nor compared", async () => {
+  const { fake, go } = setup();
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  for (const item of newBoard(fake).items) for (const name of ["Title", "Created", "Closed", "Updated"]) assert.equal(name in item.values, false);
+});
+
+test("--project-dir moves the project's owner to the organisation, atomically and only when needed", async () => {
+  const { fake, go } = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+  const dir = projectDir();
+  assert.equal(await go(undefined, [...ARGV, "--project-dir", dir]), 0, fake.logs.join("\n"));
+  assert.equal(readJson(dir, "state.json").answers.owner, "acme");
+  assert.equal(readJson(dir, "state.json").answers.owner_type, "Organization");
+  assert.equal(readJson(dir, "answers.json").owner, "acme");
+  assert.equal(readJson(dir, "answers.json").owner_type, "Organization");
+  assert.equal(readJson(dir, "answers.json").name, "Widgets");
+  assert.deepEqual(readJson(dir, "state.json").modules, ["core"]);
+});
+
+test("--project-dir leaves a project that already names the organisation untouched", async () => {
+  const { fake, go } = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+  const dir = projectDir({ slug: "widgets", owner: "acme", owner_type: "Organization" });
+  const before = readFileSync(join(dir, ".bootstrap", "state.json"), "utf8");
+  assert.equal(await go(undefined, [...ARGV, "--project-dir", dir]), 0, fake.logs.join("\n"));
+  assert.equal(readFileSync(join(dir, ".bootstrap", "state.json"), "utf8"), before);
+});
+
+test("--project-dir for a different project is refused before anything moves", async () => {
+  const { fake, go } = setup();
+  const dir = projectDir({ slug: "other", owner: "alice", owner_type: "User" });
+  assert.equal(await go(undefined, [...ARGV, "--project-dir", dir]), 1);
+  assert.match(fake.logs.join("\n"), /is the project "other", not widgets/);
+  assert.deepEqual(fake.mutations, []);
+});
+
+test("without --project-dir the report says the bootstrap owner must be changed", async () => {
+  const { fake, go } = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  assert.match(fake.logs.join("\n"), /\.bootstrap owner must be changed to acme/);
+});
+
+test("release-app says to delete the old App before running release-app", async () => {
+  const { fake, go } = setup({ withBoard: false, syncWorkflow: false });
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  const logs = fake.logs.join("\n");
+  assert.ok(logs.indexOf("First delete the old personal release App") < logs.indexOf("Then run: node skills/bootstrap/scripts/secrets.mjs release-app"));
+});
+
+function sharedBoard(fake, board, others) {
+  for (const other of others) {
+    fake.addItem(board, { contentId: fake.addContent(other), values: { Status: { type: "single", value: "Todo" } } });
+  }
+}
+
+test("inventory lists other repositories with items on the board", async () => {
+  const { fake, go, board } = setup();
+  fake.addRepo("acme", "other");
+  sharedBoard(fake, board, ["acme/other", "acme/other", "alice/side"]);
+  assert.equal(await go(undefined, [...ARGV, "--dry-run"]), 0, fake.logs.join("\n"));
+  assert.match(fake.logs.join("\n"), /Other repositories with items on this board: acme\/other, alice\/side/);
+});
+
+test("link points other organisation repositories at the new board and reports what each still needs", async () => {
+  const { fake, go, board } = setup();
+  const other = fake.addRepo("acme", "other");
+  other.variables.set("PROJECT_ID", board.id);
+  sharedBoard(fake, board, ["acme/other", "alice/side"]);
+  fake.addRepo("alice", "side").variables.set("PROJECT_ID", "somewhere-else");
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  const copy = newBoard(fake);
+  assert.equal(other.variables.get("PROJECT_ID"), copy.id);
+  for (const name of ["PROJECT_STATUS_FIELD_ID", "PROJECT_IN_PROGRESS_OPTION", "PROJECT_IN_REVIEW_OPTION"]) assert.ok(other.variables.has(name), name);
+  assert.deepEqual(other.linked, [copy.id]);
+  assert.equal(fake.mutations.filter(label => label === "LinkRepo").length, 2);
+  const logs = fake.logs.join("\n");
+  assert.match(logs, /acme\/other is linked to the new board .* the add-issue job, and PROJECT_STATUS_PAT deleting/);
+  assert.match(logs, /alice\/side is still on alice and has items on the board/);
+});
+
+test("the old board is kept while another repository still uses it as PROJECT_ID", async () => {
+  const { fake, go, board } = setup();
+  fake.addRepo("alice", "side").variables.set("PROJECT_ID", board.id);
+  sharedBoard(fake, board, ["alice/side"]);
+  assert.equal(await go(), 1);
+  assert.match(fake.logs.join("\n"), /alice\/side still use the old board as PROJECT_ID/);
+  assert.equal(fake.projects.has(board.id), true);
+  fake.repos.get("alice/side").variables.set("PROJECT_ID", "new-place");
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  assert.equal(fake.projects.has(board.id), false);
+});
+
+test("a repository that is gone doesn't block deleting the old board, and is reported", async () => {
+  const { fake, go, board } = setup();
+  sharedBoard(fake, board, ["alice/vanished"]);
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  assert.match(fake.logs.join("\n"), /alice\/vanished is gone or can't be read/);
+  assert.equal(fake.projects.has(board.id), false);
+});
+
+test("a failed PROJECT_ID read keeps the old board instead of counting the repository as gone", async () => {
+  const { fake, go, board } = setup();
+  fake.addRepo("alice", "side").variables.set("PROJECT_ID", "new-place");
+  sharedBoard(fake, board, ["alice/side"]);
+  fake.hooks.variableGet = () => ({ status: 1, stdout: "", stderr: "gh: Server Error (HTTP 502)" });
+  assert.equal(await go(), 1);
+  assert.match(fake.logs.join("\n"), /variable get failed \(HTTP 502\)/);
+  assert.equal(fake.projects.has(board.id), true);
+});
+
+test("link stops when the moved repository can't be found", async () => {
+  const { fake, go } = setup();
+  fake.hooks.repositoryRead = key => !(key === "acme/widgets" && fake.logs.includes("Phase link"));
+  assert.equal(await go(), 1);
+  assert.match(fake.logs.join("\n"), /acme\/widgets wasn't found, so it can't be linked to the new board/);
+  assert.equal(fake.mutations.includes("LinkRepo"), false);
 });

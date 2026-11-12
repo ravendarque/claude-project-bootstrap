@@ -8,7 +8,7 @@ import { defaultStateDir, isRepoName, openState } from "./migrate/state.mjs";
 
 export const DEFAULT_ORG = "oneloneraven";
 
-const USAGE = `Usage: migrate.mjs <repo> [--dry-run] [--org ${DEFAULT_ORG}] [--vault <name>]`;
+const USAGE = `Usage: migrate.mjs <repo> [--dry-run] [--org ${DEFAULT_ORG}] [--vault <name>] [--project-dir <dir>]`;
 const ORG_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 
 async function checkGh(deps) {
@@ -23,7 +23,7 @@ export async function runCli(argv, deps, { stateDir = defaultStateDir() } = {}) 
     parsed = parseArgs({
       args: argv,
       allowPositionals: true,
-      options: { "dry-run": { type: "boolean", default: false }, org: { type: "string", default: DEFAULT_ORG }, vault: { type: "string", default: "Dev" } },
+      options: { "dry-run": { type: "boolean", default: false }, org: { type: "string", default: DEFAULT_ORG }, vault: { type: "string", default: "Dev" }, "project-dir": { type: "string" } },
     });
   } catch {
     deps.log(USAGE);
@@ -39,7 +39,7 @@ export async function runCli(argv, deps, { stateDir = defaultStateDir() } = {}) 
     const gh = createGithub(deps);
     const login = await gh.login();
     if (login.toLowerCase() === parsed.values.org.toLowerCase()) throw new Error(`You're signed in as ${login}, the target organisation: sign in as the repository's owner`);
-    await runMigration({ deps, gh, store: openState(stateDir, repo), repo, org: parsed.values.org, login, vault: parsed.values.vault, dry: parsed.values["dry-run"] });
+    await runMigration({ deps, gh, store: openState(stateDir, repo), repo, org: parsed.values.org, login, vault: parsed.values.vault, projectDir: parsed.values["project-dir"], dry: parsed.values["dry-run"] });
     return 0;
   } catch (error) {
     deps.log(error.message);

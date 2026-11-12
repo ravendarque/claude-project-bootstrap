@@ -1,5 +1,5 @@
 const PAGE = "pageInfo { hasNextPage endCursor }";
-const FIELD = "field { ... on ProjectV2FieldCommon { name } }";
+const FIELD = "field { ... on ProjectV2FieldCommon { name dataType } }";
 const valuesField = cursor => `fieldValues(first: 100, after: ${cursor}) { nodes { __typename
   ... on ProjectV2ItemFieldSingleSelectValue { name ${FIELD} }
   ... on ProjectV2ItemFieldNumberValue { number ${FIELD} }
@@ -21,7 +21,7 @@ const FIELDS = `query BoardFields($id: ID!, $after: String) {
 const ITEMS = `query BoardItems($id: ID!, $after: String) {
   node(id: $id) { ... on ProjectV2 { items(first: 100, after: $after, archivedStates: [ARCHIVED, NOT_ARCHIVED]) { nodes {
     id isArchived type
-    content { ... on Issue { id url } ... on PullRequest { id url } ... on DraftIssue { id } }
+    content { ... on Issue { id url repository { nameWithOwner } } ... on PullRequest { id url repository { nameWithOwner } } ... on DraftIssue { id } }
     ${valuesField("null")}
   } ${PAGE} } } }
 }`;
@@ -41,7 +41,9 @@ const WORKFLOWS = `query BoardWorkflows($id: ID!, $after: String) {
   node(id: $id) { ... on ProjectV2 { workflows(first: 100, after: $after) { nodes { name enabled } ${PAGE} } } }
 }`;
 
-const IGNORED_FIELDS = new Set(["Title", "Assignees", "Labels", "Linked pull requests", "Milestone", "Repository", "Reviewers", "Parent issue", "Sub-issues progress"]);
+const VALUE_TYPES = new Set(["SINGLE_SELECT", "NUMBER", "TEXT", "DATE", "ITERATION"]);
+
+export const isValueField = dataType => VALUE_TYPES.has(dataType);
 
 export const isCopyable = item => (item.type === "ISSUE" || item.type === "PULL_REQUEST") && Boolean(item.url);
 
@@ -67,7 +69,7 @@ function toValues(nodes) {
   for (const node of nodes) {
     const name = node.field?.name;
     const value = toValue(node);
-    if (name && value && !IGNORED_FIELDS.has(name)) values[name] = value;
+    if (name && value && isValueField(node.field.dataType)) values[name] = value;
   }
   return values;
 }
@@ -93,7 +95,7 @@ export async function readItems(gh, id) {
       const more = await gh.paginate(ITEM_VALUES, { id: node.id, after: node.fieldValues.pageInfo.endCursor }, data => data.node.fieldValues);
       values = [...values, ...more];
     }
-    items.push({ id: node.id, archived: node.isArchived, type: node.type, contentId: node.content?.id ?? null, url: node.content?.url ?? null, values: toValues(values) });
+    items.push({ id: node.id, archived: node.isArchived, type: node.type, contentId: node.content?.id ?? null, url: node.content?.url ?? null, repository: node.content?.repository?.nameWithOwner ?? null, values: toValues(values) });
   }
   return items;
 }
