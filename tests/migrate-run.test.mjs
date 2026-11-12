@@ -458,3 +458,21 @@ test("a repository that is gone doesn't block deleting the old board, and is rep
   assert.match(fake.logs.join("\n"), /alice\/vanished is gone or can't be read/);
   assert.equal(fake.projects.has(board.id), false);
 });
+
+test("a failed PROJECT_ID read keeps the old board instead of counting the repository as gone", async () => {
+  const { fake, go, board } = setup();
+  fake.addRepo("alice", "side").variables.set("PROJECT_ID", "new-place");
+  sharedBoard(fake, board, ["alice/side"]);
+  fake.hooks.variableGet = () => ({ status: 1, stdout: "", stderr: "gh: Server Error (HTTP 502)" });
+  assert.equal(await go(), 1);
+  assert.match(fake.logs.join("\n"), /variable get failed \(HTTP 502\)/);
+  assert.equal(fake.projects.has(board.id), true);
+});
+
+test("link stops when the moved repository can't be found", async () => {
+  const { fake, go } = setup();
+  fake.hooks.repositoryRead = key => !(key === "acme/widgets" && fake.logs.includes("Phase link"));
+  assert.equal(await go(), 1);
+  assert.match(fake.logs.join("\n"), /acme\/widgets wasn't found, so it can't be linked to the new board/);
+  assert.equal(fake.mutations.includes("LinkRepo"), false);
+});

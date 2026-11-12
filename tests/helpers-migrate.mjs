@@ -235,7 +235,7 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
         if (world.pending.polls-- > 0) return reply(404, { message: "Not Found" });
         world.pending = null;
       }
-      const repo = world.repos.get(key);
+      const repo = world.hooks.repositoryRead?.(key) === false ? null : world.repos.get(key);
       return repo ? reply(200, { node_id: repo.node_id, html_url: `https://github.com/${key}` }) : reply(404, { message: "Not Found" });
     }
     if (method === "POST" && repoMatch?.[3] === "transfer") {
@@ -289,8 +289,11 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     }
     const repo = world.repos.get(args[args.indexOf("--repo") + 1]);
     const [kind, action, name] = args;
-    if (!repo && action === "get") return { status: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
-    if (kind === "variable" && action === "get") return repo.variables.has(name) ? text(`${repo.variables.get(name)}\n`) : { status: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
+    if (kind === "variable" && action === "get") {
+      const failure = world.hooks.variableGet?.(args[args.indexOf("--repo") + 1], name);
+      if (failure) return failure;
+      return repo?.variables.has(name) ? text(`${repo.variables.get(name)}\n`) : { status: 1, stdout: "", stderr: `variable ${name} was not found` };
+    }
     if (kind === "secret" && action === "list") return text(JSON.stringify([...repo.secrets].map(entry => ({ name: entry }))));
     if (kind === "secret" && action === "delete") {
       mutate(`secret delete ${name}`);

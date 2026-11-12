@@ -356,7 +356,7 @@ async function linkPhase(ctx) {
     PROJECT_IN_PROGRESS_OPTION: option("In progress"),
     PROJECT_IN_REVIEW_OPTION: option("In review"),
   };
-  await pointAtBoard(ctx, org, repo, variables);
+  if (!(await pointAtBoard(ctx, org, repo, variables))) throw new Error(`${slug(ctx)} wasn't found, so it can't be linked to the new board: check the transfer, then re-run`);
   await linkOtherRepositories(ctx, variables);
   for (let attempt = 1; ; attempt += 1) {
     await waitFor(deps, `Open ${boardUrl(ctx, newBoard)}/workflows, turn on Auto-add for ${slug(ctx)} with the filter is:issue, then type done: `);
