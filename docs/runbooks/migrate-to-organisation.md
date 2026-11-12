@@ -44,8 +44,20 @@ node skills/bootstrap/scripts/migrate.mjs <repo>
 reads the owner from there, so without the change it would create a
 personal App again. The script refuses a directory whose project isn't the
 repository being moved, before anything is transferred, and writes nothing
-when the values already match. Without the flag, the final report reminds
-you to change the owner by hand before `release-app`.
+when the values already match.
+
+If the directory has never been bootstrapped (no `.bootstrap/state.json`)
+and the repository has a release App, the phase creates a minimal
+`.bootstrap/state.json` with the organisation as owner, the repository name
+as slug, and the old board's title (or the repository name) as the project
+name. It adds `.bootstrap/` to `<dir>/.git/info/exclude` if the directory is
+a git checkout and the entry isn't already there. Without a release App it
+does nothing.
+
+Without the flag, and only when the repository has a release App, the final
+report reminds you to change the owner by hand before `release-app`. The
+reminder is checked again when the report is printed, and dropped if the
+project's state now names the organisation.
 
 ## Phases
 
@@ -53,20 +65,32 @@ you to change the owner by hand before `release-app`.
 |---|---|---|
 | `inventory` | Records the board and the repository's settings, and prints the plan. | Read the plan. |
 | `transfer` | Transfers the repository and waits up to 2 minutes for it to appear. | |
-| `bootstrap-answers` | With `--project-dir`, points the project's bootstrap answers at the organisation. Otherwise it records a reminder. | |
+| `bootstrap-answers` | With `--project-dir`, points the project's bootstrap answers at the organisation, or creates them for a project that was never bootstrapped. | |
 | `copy-board` | Copies the old board into the organisation with its draft issues, makes the copy private, and checks every field and option arrived. | |
 | `items` | Adds each issue and pull request, sets its single-select, number, text and date values, and archives it if the old item is archived. | |
 | `verify` | Compares both boards item by item, re-applies any difference up to three times, and checks the draft count. | |
 | `link` | Links the repository to the new board and sets the four `PROJECT_*` variables. Does the same for every other organisation repository with items on the board. | Turn on Auto-add for the repository with `is:issue`, then type `done`. |
 | `board-sync` | Deletes `PROJECT_STATUS_PAT` once the App variant of board sync is merged. | Open a PR in the repository that switches to `project-status-sync-app.yml`, merge it, then type `done`. |
-| `release-app` | Moves the old `release App` Pass item to the bin, and deletes `RELEASE_APP_PRIVATE_KEY` and `RELEASE_APP_CLIENT_ID`. If the Pass folder or item isn't there, it says so and creates nothing. | Delete the old personal App in your account's settings first, because App names are global and the new App can't take its name. Then run `secrets.mjs release-app` for the moved project, and type `done`. |
+| `release-app` | Moves the old `release App` Pass item to the bin, and deletes `RELEASE_APP_PRIVATE_KEY` and `RELEASE_APP_CLIENT_ID`. If the Pass folder or item isn't there, it says so and creates nothing. | Delete the old personal App in your account's settings first, because App names are global and the new App can't take its name. Only when the phase prompts, run `secrets.mjs release-app` for the moved project, then type `done`. |
 | `delete-old-board` | Deletes the personal board, only if `verify` passed and no other repository still has the old board as its `PROJECT_ID`. | Type the old board's exact title. |
 
 Phases that don't apply, such as `board-sync` for a repository without the
 workflow, log why and finish at once.
 
 The script makes at most one change a second, and waits when GitHub
-rate-limits it. A board of 800 items takes about an hour.
+rate-limits it. It also retries connection failures, such as a timeout
+reaching the API, waiting 5, 15 and then 45 seconds. After the third retry
+it stops with a message to re-run, and the re-run resumes. A change is only
+retried when the request can't have reached GitHub (the connection or name
+lookup failed before any response), so a retry can't apply it twice. A board
+of 800 items takes about an hour.
+
+**Don't run `secrets.mjs release-app` before the `release-app` phase
+prompts.** The phase clears the old Pass item, secret and variable the first
+time it runs, so credentials created earlier would be deleted. Once it has
+cleared them it records that, and a re-run skips the clean-up. If the new
+secret and variable are already there when it resumes, it accepts them
+without asking.
 
 ## Boards shared by more than one repository
 
@@ -149,7 +173,8 @@ The script ends by listing what's left. Typically:
   single-select, number, text and date values are copied, decided by each
   field's type; built-in fields such as Title, Created, Updated and Closed
   are left to GitHub.
-- **The project's bootstrap owner**, when `--project-dir` wasn't given.
+- **The project's bootstrap owner**, when the repository has a release App
+  and `--project-dir` wasn't given.
 - **Pages:** check the custom domain on the moved repository and that the
   site still answers. GitHub doesn't redirect Pages after a transfer, so a
   DNS record pointing at the personal account's `github.io` host must move
