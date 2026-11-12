@@ -104,3 +104,55 @@ test("state persists phases, notes and the mapping", () => {
   assert.deepEqual(second.data.mapping.a, { newId: "b", done: true });
   assert.deepEqual(second.data.notes, ["one"]);
 });
+
+const DIAL = "dial tcp 140.82.121.6:443: i/o timeout";
+
+test("a connection failure on a read is retried with 5, 15 and 45 second backoffs, then recovers", async () => {
+  const { fake, gh } = world();
+  fake.limits.push({ match: /^GET repos\/alice\/widgets$/, remaining: 3, network: DIAL });
+  assert.ok(await gh.repository("alice", "widgets"));
+  assert.deepEqual(fake.sleeps, [5000, 15_000, 45_000]);
+});
+
+test("a connection failure before a response on a mutation is retried", async () => {
+  const { fake, gh } = world();
+  fake.limits.push({ match: /^POST repos\/alice\/widgets\/transfer$/, remaining: 1, network: DIAL });
+  await gh.transfer("alice", "widgets", "acme");
+  assert.deepEqual(fake.sleeps, [5000]);
+  assert.equal(fake.mutations.filter(label => label === "transfer").length, 1);
+});
+
+test("failures that may have reached GitHub aren't retried for a mutation", async () => {
+  const { fake, gh } = world();
+  fake.limits.push({ match: /^POST repos\/alice\/widgets\/transfer$/, remaining: 1, network: "read tcp 1.2.3.4:5->6.7.8.9:443: connection reset by peer" });
+  await assert.rejects(gh.transfer("alice", "widgets", "acme"), /failed/);
+  assert.deepEqual(fake.sleeps, []);
+  assert.deepEqual(fake.mutations, []);
+});
+
+test("four connection failures in a row is an error that says to re-run", async () => {
+  const { fake, gh } = world();
+  fake.limits.push({ match: /^GET repos\/alice\/widgets$/, remaining: 9, network: DIAL });
+  await assert.rejects(gh.repository("alice", "widgets"), /after 3 retries: check your connection, then re-run to resume/);
+  assert.deepEqual(fake.sleeps, [5000, 15_000, 45_000]);
+});
+
+test("a 503 on a read is retried", async () => {
+  const sleeps = [];
+  let calls = 0;
+  const gh = createGithub({
+    exec: async () => (++calls < 2 ? { status: 1, stdout: 'HTTP/2.0 503 Service Unavailable\r\n\r\n{"message":"unavailable"}', stderr: "gh: x (HTTP 503)" } : { status: 0, stdout: 'HTTP/2.0 200 OK\r\n\r\n{"node_id":"R"}', stderr: "" }),
+    sleep: async ms => sleeps.push(ms),
+    log: () => {},
+  });
+  assert.equal((await gh.repository("alice", "widgets")).node_id, "R");
+  assert.deepEqual(sleeps, [5000]);
+});
+
+test("connection retries and rate-limit retries are counted separately", async () => {
+  const { fake, gh } = world();
+  fake.limits.push({ match: /^GET repos\/alice\/widgets$/, remaining: 3, network: DIAL });
+  fake.limits.push({ match: /^GET repos\/alice\/widgets$/, remaining: 2, retryAfter: 1 });
+  assert.ok(await gh.repository("alice", "widgets"));
+  assert.equal(fake.sleeps.length, 5);
+});

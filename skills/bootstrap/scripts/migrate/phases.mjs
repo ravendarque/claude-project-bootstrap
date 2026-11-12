@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Vault } from "../secrets/vault.mjs";
 import { loadState, saveRun } from "../state.mjs";
@@ -100,18 +100,37 @@ function writeJsonAtomic(path, value) {
   renameSync(`${path}.tmp`, path);
 }
 
+function excludeBootstrap(projectDir) {
+  const git = join(projectDir, ".git");
+  if (!existsSync(git) || !statSync(git).isDirectory()) return false;
+  const file = join(git, "info", "exclude");
+  const current = existsSync(file) ? readFileSync(file, "utf8") : "";
+  if (current.split(/\r?\n/).some(line => line.trim() === ".bootstrap/" || line.trim() === ".bootstrap")) return false;
+  mkdirSync(join(git, "info"), { recursive: true });
+  appendFileSync(file, `${current && !current.endsWith("\n") ? "\n" : ""}.bootstrap/\n`);
+  return true;
+}
+
+function createBootstrapState(ctx) {
+  const { deps, store, org, repo, projectDir } = ctx;
+  if (!store.data.inventory.releaseApp) return deps.log(`${projectDir} has no .bootstrap/state.json, and ${repo} has no release App, so nothing is needed`);
+  const name = store.data.inventory.board?.title ?? repo;
+  saveRun(projectDir, { answers: { owner: org, owner_type: "Organization", slug: repo, name }, modules: [] });
+  const excluded = excludeBootstrap(projectDir);
+  deps.log(`${projectDir} had never been bootstrapped: created a minimal .bootstrap/state.json for release-app${excluded ? " and kept it out of git" : ""}`);
+}
+
+function ownerNamed(ctx) {
+  const file = ctx.projectDir && join(ctx.projectDir, ".bootstrap", "state.json");
+  if (!file || !existsSync(file)) return false;
+  return loadState(ctx.projectDir).answers?.owner === ctx.org;
+}
+
 async function bootstrapAnswersPhase(ctx) {
   const { deps, store, org, projectDir } = ctx;
-  const reminder = `The project's .bootstrap owner must be changed to ${org} (owner_type Organization) before release-app: re-run with --project-dir, or edit state.json and answers.json by hand`;
-  if (!projectDir) {
-    store.note(reminder);
-    return deps.log("No --project-dir given, so the project's bootstrap answers are unchanged");
-  }
+  if (!projectDir) return deps.log("No --project-dir given, so the project's bootstrap answers are unchanged");
   const state = projectAnswers(ctx);
-  if (!state) {
-    store.note(`${projectDir} has no .bootstrap/state.json. ${reminder}`);
-    return deps.log(`${projectDir} has no .bootstrap/state.json, so there's nothing to update`);
-  }
+  if (!state) return createBootstrapState(ctx);
   const wanted = { owner: org, owner_type: "Organization" };
   const matches = values => Object.entries(wanted).every(([key, value]) => values[key] === value);
   if (matches(state.answers)) deps.log("The project's bootstrap state already names the organisation");
@@ -386,16 +405,25 @@ async function boardSyncPhase(ctx) {
 async function releaseAppPhase(ctx) {
   const { gh, deps, repo } = ctx;
   if (!ctx.store.data.inventory.releaseApp) return deps.log(`${repo} has no release App`);
-  const vault = new Vault(deps, { vault: ctx.vault, folder: repo });
-  const item = await vault.find(RELEASE_ITEM, { create: false });
-  if (item) {
-    await vault.trash(item);
-    deps.log(`Moved the old ${RELEASE_ITEM} item in Pass to the bin`);
+  const { data } = ctx.store;
+  const hasNew = async () => (await gh.secretNames(slug(ctx))).includes(RELEASE_SECRET) && (await gh.variableNames(slug(ctx))).includes(RELEASE_VARIABLE);
+  if (data.releaseCleared) {
+    if (await hasNew()) return deps.log("The new release App's secret and variable are already in place");
+    deps.log("The old release App was already cleared away, so it won't be again");
   } else {
-    deps.log(`No old ${RELEASE_ITEM} item was found in ${ctx.vault}/${repo}: check Pass by hand before creating the new App`);
+    const vault = new Vault(deps, { vault: ctx.vault, folder: repo });
+    const item = await vault.find(RELEASE_ITEM, { create: false });
+    if (item) {
+      await vault.trash(item);
+      deps.log(`Moved the old ${RELEASE_ITEM} item in Pass to the bin`);
+    } else {
+      deps.log(`No old ${RELEASE_ITEM} item was found in ${ctx.vault}/${repo}: check Pass by hand before creating the new App`);
+    }
+    if ((await gh.secretNames(slug(ctx))).includes(RELEASE_SECRET)) await gh.deleteSecret(slug(ctx), RELEASE_SECRET);
+    if ((await gh.variableNames(slug(ctx))).includes(RELEASE_VARIABLE)) await gh.deleteVariable(slug(ctx), RELEASE_VARIABLE);
+    data.releaseCleared = true;
+    ctx.store.save();
   }
-  if ((await gh.secretNames(slug(ctx))).includes(RELEASE_SECRET)) await gh.deleteSecret(slug(ctx), RELEASE_SECRET);
-  if ((await gh.variableNames(slug(ctx))).includes(RELEASE_VARIABLE)) await gh.deleteVariable(slug(ctx), RELEASE_VARIABLE);
   deps.log("First delete the old personal release App in your account's settings: GitHub App names are global, so the new App can't take its name.");
   deps.log(`Then run: node skills/bootstrap/scripts/secrets.mjs release-app ${ctx.projectDir ?? "<project dir>"}`);
   await waitFor(deps, "Type done once the old App is deleted and the new release App is set up: ");
@@ -444,6 +472,7 @@ function report(ctx) {
   const { deps, store } = ctx;
   const { inventory: found, notes } = store.data;
   const left = [...notes];
+  if (found.releaseApp && !ownerNamed(ctx)) left.push(`The project's .bootstrap owner must be changed to ${ctx.org} (owner_type Organization) before release-app: re-run with --project-dir, or edit state.json and answers.json by hand`);
   if (found.pages) left.push(`Pages: check the custom domain on ${slug(ctx)} (${found.pages.cname ?? found.pages.url}) and that the site still answers`);
   if (found.packages?.length) left.push(`Packages ${found.packages.join(", ")} need a new scope and a republish, from the repository`);
   if (found.packages === null) left.push("Packages couldn't be listed: check for npm packages that need a new scope");

@@ -1,6 +1,10 @@
 export const MUTATION_GAP_MS = 1000;
 export const MAX_RATE_LIMITS = 3;
 export const DEFAULT_BACKOFF_MS = 60_000;
+export const NETWORK_BACKOFF_MS = [5000, 15_000, 45_000];
+
+const CONNECTION_FAILURE = /i\/o timeout|dial tcp|connection reset|TLS handshake timeout|no such host|api\.github\.com[^\n]*EOF/;
+const BEFORE_RESPONSE = /dial tcp|no such host|TLS handshake timeout/;
 
 function splitResponse(stdout) {
   const status = /^HTTP\/\S+ (\d{3})/.exec(stdout);
@@ -26,7 +30,7 @@ function parse({ status: exit, stdout = "", stderr = "" }) {
   } catch {
     body = split.text;
   }
-  return { status, headers: split.headers, body, stderr };
+  return { status, headers: split.headers, body, stderr, exit };
 }
 
 const messageOf = response => String((response.body && typeof response.body === "object" ? response.body.message : response.body) ?? response.stderr ?? "").trim();
@@ -35,6 +39,11 @@ function isRateLimited(response) {
   if (response.status === 429) return true;
   if (response.status === 403 && (response.headers["retry-after"] || /rate limit|abuse/i.test(`${messageOf(response)} ${response.stderr}`))) return true;
   return Array.isArray(response.body?.errors) && response.body.errors.some(error => error.type === "RATE_LIMITED");
+}
+
+function isConnectionFailure(response, mutation) {
+  if (response.exit !== 0 && (mutation ? BEFORE_RESPONSE : CONNECTION_FAILURE).test(response.stderr)) return true;
+  return !mutation && [502, 503, 504].includes(response.status);
 }
 
 function backoffMs(response) {
@@ -50,9 +59,21 @@ export function createGithub(deps) {
       if (mutated) await deps.sleep(MUTATION_GAP_MS);
       mutated = true;
     }
-    for (let limited = 1; ; limited += 1) {
+    let limited = 0;
+    let retries = 0;
+    for (;;) {
       const response = parse(await deps.exec("gh", args, input === undefined ? {} : { input }));
+      if (isConnectionFailure(response, mutation)) {
+        if (retries >= NETWORK_BACKOFF_MS.length) {
+          throw new Error(`Couldn't reach GitHub for gh ${args.slice(0, 2).join(" ")} after ${retries} retries: check your connection, then re-run to resume`);
+        }
+        deps.log(`Couldn't reach GitHub: retrying in ${NETWORK_BACKOFF_MS[retries] / 1000} s`);
+        await deps.sleep(NETWORK_BACKOFF_MS[retries]);
+        retries += 1;
+        continue;
+      }
       if (!isRateLimited(response)) return response;
+      limited += 1;
       if (limited >= MAX_RATE_LIMITS) {
         throw new Error(`GitHub rate-limited gh ${args.slice(0, 2).join(" ")} ${MAX_RATE_LIMITS} times in a row: wait a while, then re-run to resume`);
       }

@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadContext } from "../skills/bootstrap/scripts/secrets/context.mjs";
 import { createGithub } from "../skills/bootstrap/scripts/migrate/github.mjs";
 import { readItems } from "../skills/bootstrap/scripts/migrate/board.mjs";
 import { openState } from "../skills/bootstrap/scripts/migrate/state.mjs";
@@ -395,11 +396,105 @@ test("--project-dir for a different project is refused before anything moves", a
   assert.deepEqual(fake.mutations, []);
 });
 
-test("without --project-dir the report says the bootstrap owner must be changed", async () => {
-  const { fake, go } = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+test("without --project-dir the report says the bootstrap owner must be changed, but only when there's a release App", async () => {
+  const { fake, go } = setup({ withBoard: false, syncWorkflow: false });
   assert.equal(await go(), 0, fake.logs.join("\n"));
   assert.match(fake.logs.join("\n"), /\.bootstrap owner must be changed to acme/);
+
+  const plain = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+  assert.equal(await plain.go(), 0, plain.fake.logs.join("\n"));
+  assert.doesNotMatch(plain.fake.logs.join("\n"), /\.bootstrap owner/);
 });
+
+test("the owner reminder is dropped once the project's state names the organisation", async () => {
+  const { fake, go } = setup({ withBoard: false, syncWorkflow: false });
+  assert.equal(await go(undefined, [...ARGV, "--project-dir", projectDir()]), 0, fake.logs.join("\n"));
+  assert.doesNotMatch(fake.logs.join("\n"), /\.bootstrap owner must be changed/);
+});
+
+test("release-app is safe to re-run: the new Pass item, secret and variable survive", async () => {
+  const { fake, go, repo } = setup({ withBoard: false, syncWorkflow: false });
+  const scripted = scriptedAnswers(fake);
+  assert.equal(
+    await go(question => {
+      if (/new release App/.test(question)) throw new Error("killed");
+      return scripted(question);
+    }),
+    1,
+  );
+  assert.deepEqual(fake.trashed, ["-oldpassid"]);
+
+  fake.passItems.push({ id: "newpassid", title: "release App", folder_id: "f1" });
+  repo.secrets.add("RELEASE_APP_PRIVATE_KEY");
+  repo.variables.set("RELEASE_APP_CLIENT_ID", "Iv1.new");
+  const before = fake.mutations.length;
+  assert.equal(
+    await go(question => {
+      assert.doesNotMatch(question, /release App/);
+      return scripted(question);
+    }),
+    0,
+    fake.logs.join("\n"),
+  );
+  assert.deepEqual(fake.trashed, ["-oldpassid"]);
+  assert.equal(fake.mutations.slice(before).some(label => /delete/.test(label)), false);
+  assert.equal(repo.secrets.has("RELEASE_APP_PRIVATE_KEY"), true);
+  assert.equal(repo.variables.get("RELEASE_APP_CLIENT_ID"), "Iv1.new");
+});
+
+test("a re-run after the clean-up prompts again if the new App isn't there yet, without clearing anything", async () => {
+  const { fake, go, repo } = setup({ withBoard: false, syncWorkflow: false });
+  const scripted = scriptedAnswers(fake);
+  assert.equal(await go(question => { if (/new release App/.test(question)) throw new Error("killed"); return scripted(question); }), 1);
+  const before = fake.mutations.length;
+  assert.equal(await go(scripted), 0, fake.logs.join("\n"));
+  assert.equal(fake.mutations.slice(before).some(label => /delete/.test(label)), false);
+  assert.equal(repo.variables.get("RELEASE_APP_CLIENT_ID"), "Iv1.new");
+});
+
+function bareProject({ git = true, exclude } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "bare-"));
+  if (git) {
+    mkdirSync(join(dir, ".git", "info"), { recursive: true });
+    if (exclude !== undefined) writeFileSync(join(dir, ".git", "info", "exclude"), exclude);
+  }
+  return dir;
+}
+
+test("a never-bootstrapped project gets a minimal state that loadContext accepts, kept out of git", async () => {
+  const { fake, go } = setup({ syncWorkflow: false });
+  const dir = bareProject({ exclude: "# comment\nnode_modules" });
+  assert.equal(await go(undefined, [...ARGV, "--project-dir", dir]), 0, fake.logs.join("\n"));
+  assert.deepEqual(readJson(dir, "state.json").answers, { owner: "acme", owner_type: "Organization", slug: "widgets", name: "Widgets" });
+  const ctx = loadContext(dir);
+  assert.equal(ctx.repo, "acme/widgets");
+  assert.equal(ctx.name, "Widgets");
+  assert.equal(readFileSync(join(dir, ".git", "info", "exclude"), "utf8"), "# comment\nnode_modules\n.bootstrap/\n");
+});
+
+test("a never-bootstrapped project without a board is named after the repository, and an existing exclude entry isn't duplicated", async () => {
+  const { fake, go } = setup({ withBoard: false, syncWorkflow: false });
+  const dir = bareProject({ exclude: ".bootstrap/\n" });
+  assert.equal(await go(undefined, [...ARGV, "--project-dir", dir]), 0, fake.logs.join("\n"));
+  assert.equal(loadContext(dir).name, "widgets");
+  assert.equal(readFileSync(join(dir, ".git", "info", "exclude"), "utf8"), ".bootstrap/\n");
+});
+
+test("a never-bootstrapped project with no git directory is still given a state", async () => {
+  const { fake, go } = setup({ withBoard: false, syncWorkflow: false });
+  const dir = bareProject({ git: false });
+  assert.equal(await go(undefined, [...ARGV, "--project-dir", dir]), 0, fake.logs.join("\n"));
+  assert.equal(loadContext(dir).owner, "acme");
+});
+
+test("without a release App a never-bootstrapped project is left alone", async () => {
+  const { fake, go } = setup({ withBoard: false, releaseApp: false, syncWorkflow: false });
+  const dir = bareProject();
+  assert.equal(await go(undefined, [...ARGV, "--project-dir", dir]), 0, fake.logs.join("\n"));
+  assert.equal(existsSync(join(dir, ".bootstrap")), false);
+  assert.doesNotMatch(fake.logs.join("\n"), /\.bootstrap owner/);
+});
+
 
 test("release-app says to delete the old App before running release-app", async () => {
   const { fake, go } = setup({ withBoard: false, syncWorkflow: false });
@@ -465,7 +560,7 @@ test("a failed PROJECT_ID read keeps the old board instead of counting the repos
   sharedBoard(fake, board, ["alice/side"]);
   fake.hooks.variableGet = () => ({ status: 1, stdout: "", stderr: "gh: Server Error (HTTP 502)" });
   assert.equal(await go(), 1);
-  assert.match(fake.logs.join("\n"), /variable get failed \(HTTP 502\)/);
+  assert.match(fake.logs.join("\n"), /Couldn.t reach GitHub for gh variable get after 3 retries/);
   assert.equal(fake.projects.has(board.id), true);
 });
 

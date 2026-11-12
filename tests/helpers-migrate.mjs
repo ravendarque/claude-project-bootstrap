@@ -222,6 +222,7 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     if (!limit) return null;
     limit.remaining -= 1;
     limit.seen = (limit.seen ?? 0) + 1;
+    if (limit.network) return { status: 1, stdout: "", stderr: `Post "https://api.github.com/graphql": ${limit.network}` };
     if (graphql) return reply(200, { errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded" }] });
     return reply(limit.status ?? 403, { message: "You have exceeded a secondary rate limit" }, limit.retryAfter === undefined ? {} : { "Retry-After": String(limit.retryAfter) });
   }
