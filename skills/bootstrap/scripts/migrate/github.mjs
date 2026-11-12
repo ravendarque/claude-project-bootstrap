@@ -129,6 +129,10 @@ export function createGithub(deps) {
     transfer: (owner, name, newOwner) => rest("POST", `repos/${owner}/${name}/transfer`, { fields: { new_owner: newOwner } }),
     pages: (owner, name) => rest("GET", `repos/${owner}/${name}/pages`, { allow404: true }),
     fileExists: async (owner, name, path) => (await rest("GET", `repos/${owner}/${name}/contents/${path}`, { allow404: true })) !== null,
+    async variableValue(repo, name) {
+      const response = await call(["variable", "get", name, "--repo", repo]);
+      return response.status >= 400 ? null : String(response.body ?? "").trim();
+    },
     async fileText(owner, name, path) {
       const file = await rest("GET", `repos/${owner}/${name}/contents/${path}`, { allow404: true });
       return file?.content === undefined ? null : Buffer.from(file.content, "base64").toString("utf8");

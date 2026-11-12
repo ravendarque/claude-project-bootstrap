@@ -1,4 +1,7 @@
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { Vault } from "../secrets/vault.mjs";
+import { loadState, saveRun } from "../state.mjs";
 import {
   addItem,
   applyValues,
@@ -12,6 +15,7 @@ import {
   deleteBoard,
   describeIssue,
   isCopyable,
+  isValueField,
   linkRepository,
   linkedBoards,
   makePrivate,
@@ -71,6 +75,7 @@ function printPlan(ctx, inventory) {
   } else {
     deps.log("Board: none linked, so the board phases will be skipped");
   }
+  if (inventory.otherRepos?.length) deps.log(`Other repositories with items on this board: ${inventory.otherRepos.join(", ")}`);
   deps.log(`Secrets: ${inventory.secrets.join(", ") || "none"}`);
   deps.log(`Variables: ${inventory.variables.join(", ") || "none"}`);
   deps.log(`Pages: ${inventory.pages ? `${inventory.pages.cname ?? inventory.pages.url}` : "none"}`);
@@ -78,6 +83,45 @@ function printPlan(ctx, inventory) {
   deps.log(`Release App: ${inventory.releaseApp ? "yes, it needs recreating in the organisation" : "no"}`);
   deps.log(`Board sync workflow: ${inventory.syncWorkflow ? "yes, it needs the App variant" : "no"}`);
   deps.log(`Phases: ${PHASES.map(phase => phase.name).join(", ")}`);
+}
+
+function projectAnswers(ctx) {
+  const file = join(ctx.projectDir, ".bootstrap", "state.json");
+  if (!existsSync(file)) return null;
+  const state = loadState(ctx.projectDir);
+  if (state.answers?.slug !== ctx.repo) {
+    throw new Error(`${ctx.projectDir} is the project "${state.answers?.slug ?? "unknown"}", not ${ctx.repo}: pass the right --project-dir`);
+  }
+  return state;
+}
+
+function writeJsonAtomic(path, value) {
+  writeFileSync(`${path}.tmp`, `${JSON.stringify(value, null, 2)}\n`);
+  renameSync(`${path}.tmp`, path);
+}
+
+async function bootstrapAnswersPhase(ctx) {
+  const { deps, store, org, projectDir } = ctx;
+  const reminder = `The project's .bootstrap owner must be changed to ${org} (owner_type Organization) before release-app: re-run with --project-dir, or edit state.json and answers.json by hand`;
+  if (!projectDir) {
+    store.note(reminder);
+    return deps.log("No --project-dir given, so the project's bootstrap answers are unchanged");
+  }
+  const state = projectAnswers(ctx);
+  if (!state) {
+    store.note(`${projectDir} has no .bootstrap/state.json. ${reminder}`);
+    return deps.log(`${projectDir} has no .bootstrap/state.json, so there's nothing to update`);
+  }
+  const wanted = { owner: org, owner_type: "Organization" };
+  const matches = values => Object.entries(wanted).every(([key, value]) => values[key] === value);
+  if (matches(state.answers)) deps.log("The project's bootstrap state already names the organisation");
+  else saveRun(projectDir, { answers: { ...state.answers, ...wanted }, modules: state.modules });
+  const answersFile = join(projectDir, ".bootstrap", "answers.json");
+  if (existsSync(answersFile)) {
+    const input = JSON.parse(readFileSync(answersFile, "utf8"));
+    if (!matches(input)) writeJsonAtomic(answersFile, { ...input, ...wanted });
+  }
+  deps.log(`The project's bootstrap answers now name ${org} as the owner`);
 }
 
 async function inventory(ctx) {
@@ -93,10 +137,13 @@ async function inventory(ctx) {
   if (linked.length > 1) {
     throw new Error(`${login}/${repo} is linked to ${linked.length} boards (${linked.map(entry => entry.title).join(", ")}): unlink all but one, then re-run`);
   }
+  if (ctx.projectDir) projectAnswers(ctx);
   let board = null;
+  let otherRepos = [];
   if (linked.length === 1) {
     const meta = await readBoard(gh, linked[0].id);
     const items = await readItems(gh, meta.id);
+    otherRepos = [...new Set(items.filter(isCopyable).map(item => item.repository).filter(name => name && name.toLowerCase() !== `${login}/${repo}`.toLowerCase()))];
     board = { id: meta.id, number: meta.number, title: meta.title, fields: meta.fields.map(({ name, dataType, options }) => ({ name, dataType, options: options.map(option => option.name) })), counts: countsOf(items) };
   }
   const secrets = await gh.secretNames(`${login}/${repo}`);
@@ -105,6 +152,7 @@ async function inventory(ctx) {
   const packages = await gh.npmPackages(repo).catch(() => null);
   store.data.inventory = {
     board,
+    otherRepos,
     secrets,
     variables,
     pages: pages ? { url: pages.html_url ?? null, cname: pages.cname ?? null } : null,
@@ -130,7 +178,7 @@ async function transfer(ctx) {
 
 function checkFieldsCopied(oldBoard, newBoard) {
   const problems = [];
-  for (const field of oldBoard.fields) {
+  for (const field of oldBoard.fields.filter(entry => isValueField(entry.dataType))) {
     const copy = newBoard.fields.find(entry => entry.name === field.name);
     if (!copy) problems.push(`field ${field.name} is missing`);
     else for (const option of field.options) if (!copy.options.some(entry => entry.name === option)) problems.push(`${field.name} has no option ${option}`);
@@ -268,13 +316,33 @@ async function verifyPhase(ctx) {
 
 const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
 
+async function pointAtBoard(ctx, owner, name, variables) {
+  const { gh, store } = ctx;
+  const target = await gh.repository(owner, name);
+  if (!target) return false;
+  if (!(await linkedBoards(gh, owner, name)).some(entry => entry.id === store.data.newBoard.id)) await linkRepository(gh, store.data.newBoard.id, target.node_id);
+  for (const [key, value] of Object.entries(variables)) await gh.setVariable(`${owner}/${name}`, key, value);
+  return true;
+}
+
+async function linkOtherRepositories(ctx, variables) {
+  const { store, org } = ctx;
+  for (const other of store.data.inventory.otherRepos ?? []) {
+    const [owner, name] = other.split("/");
+    if (owner.toLowerCase() !== org.toLowerCase()) {
+      store.note(`${other} is still on ${owner} and has items on the board: migrate it, or point its PROJECT_* variables at ${boardUrl(ctx, store.data.newBoard)} by hand`);
+    } else if (await pointAtBoard(ctx, org, name, variables)) {
+      store.note(`${other} is linked to the new board and its PROJECT_* variables are set; it still needs the App variant of board sync, the add-issue job, and ${SYNC_SECRET} deleting`);
+    } else {
+      store.note(`${other} wasn't found, so it wasn't linked: check it by hand`);
+    }
+  }
+}
+
 async function linkPhase(ctx) {
   const { gh, deps, store, org, repo } = ctx;
-  const { data } = store;
-  const { newBoard } = data;
+  const { newBoard } = store.data;
   if (!newBoard) return deps.log("No board to link");
-  const target = await gh.repository(org, repo);
-  if (!(await linkedBoards(gh, org, repo)).some(entry => entry.id === newBoard.id)) await linkRepository(gh, newBoard.id, target.node_id);
   const status = newBoard.fields.find(field => sameName(field.name, "Status") && field.options.length);
   if (!status) throw new Error("The new board has no Status field with options, so the board sync variables can't be set");
   const option = name => {
@@ -282,11 +350,14 @@ async function linkPhase(ctx) {
     if (!found) throw new Error(`The new board's Status field has no ${name} option: add one, then re-run`);
     return found.id;
   };
-  const repoSlug = slug(ctx);
-  await gh.setVariable(repoSlug, "PROJECT_ID", newBoard.id);
-  await gh.setVariable(repoSlug, "PROJECT_STATUS_FIELD_ID", status.id);
-  await gh.setVariable(repoSlug, "PROJECT_IN_PROGRESS_OPTION", option("In progress"));
-  await gh.setVariable(repoSlug, "PROJECT_IN_REVIEW_OPTION", option("In review"));
+  const variables = {
+    PROJECT_ID: newBoard.id,
+    PROJECT_STATUS_FIELD_ID: status.id,
+    PROJECT_IN_PROGRESS_OPTION: option("In progress"),
+    PROJECT_IN_REVIEW_OPTION: option("In review"),
+  };
+  await pointAtBoard(ctx, org, repo, variables);
+  await linkOtherRepositories(ctx, variables);
   for (let attempt = 1; ; attempt += 1) {
     await waitFor(deps, `Open ${boardUrl(ctx, newBoard)}/workflows, turn on Auto-add for ${slug(ctx)} with the filter is:issue, then type done: `);
     const workflows = await boardWorkflows(gh, newBoard.id);
@@ -325,8 +396,9 @@ async function releaseAppPhase(ctx) {
   }
   if ((await gh.secretNames(slug(ctx))).includes(RELEASE_SECRET)) await gh.deleteSecret(slug(ctx), RELEASE_SECRET);
   if ((await gh.variableNames(slug(ctx))).includes(RELEASE_VARIABLE)) await gh.deleteVariable(slug(ctx), RELEASE_VARIABLE);
-  deps.log(`Run: node skills/bootstrap/scripts/secrets.mjs release-app <project dir>. Then delete the old personal App in your account's settings.`);
-  await waitFor(deps, "Type done once the new release App is set up: ");
+  deps.log("First delete the old personal release App in your account's settings: GitHub App names are global, so the new App can't take its name.");
+  deps.log(`Then run: node skills/bootstrap/scripts/secrets.mjs release-app ${ctx.projectDir ?? "<project dir>"}`);
+  await waitFor(deps, "Type done once the old App is deleted and the new release App is set up: ");
   const missing = [];
   if (!(await gh.secretNames(slug(ctx))).includes(RELEASE_SECRET)) missing.push(`secret ${RELEASE_SECRET}`);
   if (!(await gh.variableNames(slug(ctx))).includes(RELEASE_VARIABLE)) missing.push(`variable ${RELEASE_VARIABLE}`);
@@ -338,6 +410,13 @@ async function deleteOldBoardPhase(ctx) {
   const old = store.data.inventory.board;
   if (!old) return deps.log("No old board to delete");
   if (!store.data.verify?.passed) throw new Error("The new board hasn't been verified, so the old board is kept");
+  const holders = [];
+  for (const other of store.data.inventory.otherRepos ?? []) {
+    const value = await gh.variableValue(other, "PROJECT_ID");
+    if (value === null) deps.log(`${other} is gone or can't be read, so its PROJECT_ID wasn't checked`);
+    else if (value === old.id) holders.push(other);
+  }
+  if (holders.length) throw new Error(`${holders.join(", ")} still use the old board as PROJECT_ID: point them at the new board (or migrate them), then re-run`);
   for (let attempt = 0; attempt < 3; attempt += 1) {
     if ((await deps.prompt(`Type the old board's exact title to delete it for good (${old.title}): `)) === old.title) {
       await deleteBoard(gh, old.id);
@@ -351,6 +430,7 @@ async function deleteOldBoardPhase(ctx) {
 export const PHASES = [
   { name: "inventory", run: inventory },
   { name: "transfer", run: transfer },
+  { name: "bootstrap-answers", run: bootstrapAnswersPhase },
   { name: "copy-board", run: copyBoardPhase },
   { name: "items", run: itemsPhase },
   { name: "verify", run: verifyPhase },

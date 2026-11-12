@@ -79,8 +79,9 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     return { nodes: list.slice(start, end).map(map), pageInfo: { hasNextPage: end < list.length, endCursor: String(end) } };
   };
 
+  const DATA_TYPES = { single: "SINGLE_SELECT", number: "NUMBER", text: "TEXT", date: "DATE", iteration: "ITERATION" };
   const valueNode = (name, { type, value }) => {
-    const field = { name };
+    const field = { name, dataType: DATA_TYPES[type] };
     if (type === "single") return { __typename: "ProjectV2ItemFieldSingleSelectValue", name: value, field };
     if (type === "number") return { __typename: "ProjectV2ItemFieldNumberValue", number: value, field };
     if (type === "text") return { __typename: "ProjectV2ItemFieldTextValue", text: value, field };
@@ -89,8 +90,11 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
   };
 
   const valueNodes = item => [
-    { __typename: "ProjectV2ItemFieldTextValue", text: "Some title", field: { name: "Title" } },
+    { __typename: "ProjectV2ItemFieldTextValue", text: "Some title", field: { name: "Title", dataType: "TITLE" } },
     { __typename: "ProjectV2ItemFieldRepositoryValue" },
+    { __typename: "ProjectV2ItemFieldDateValue", date: "2026-01-01", field: { name: "Created", dataType: "CREATED" } },
+    { __typename: "ProjectV2ItemFieldDateValue", date: "2026-02-02", field: { name: "Closed", dataType: "CLOSED" } },
+    { __typename: "ProjectV2ItemFieldTextValue", text: "x", field: { name: "Updated", dataType: "UPDATED" } },
     ...Object.entries(item.values).map(([name, value]) => valueNode(name, value)),
   ];
 
@@ -98,7 +102,7 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     id: item.id,
     isArchived: item.isArchived,
     type: item.type,
-    content: item.type === "DRAFT_ISSUE" ? { id: item.id } : item.type === "REDACTED" ? null : { id: item.contentId, url: urlOf(item.contentId) },
+    content: item.type === "DRAFT_ISSUE" ? { id: item.id } : item.type === "REDACTED" ? null : { id: item.contentId, url: urlOf(item.contentId), repository: { nameWithOwner: world.contents.get(item.contentId).repo } },
     fieldValues: connection(valueNodes(item), null),
   });
 
@@ -285,6 +289,8 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     }
     const repo = world.repos.get(args[args.indexOf("--repo") + 1]);
     const [kind, action, name] = args;
+    if (!repo && action === "get") return { status: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
+    if (kind === "variable" && action === "get") return repo.variables.has(name) ? text(`${repo.variables.get(name)}\n`) : { status: 1, stdout: "", stderr: "gh: Not Found (HTTP 404)" };
     if (kind === "secret" && action === "list") return text(JSON.stringify([...repo.secrets].map(entry => ({ name: entry }))));
     if (kind === "secret" && action === "delete") {
       mutate(`secret delete ${name}`);
