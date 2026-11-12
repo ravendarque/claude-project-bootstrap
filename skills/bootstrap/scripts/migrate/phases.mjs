@@ -20,6 +20,8 @@ import {
   setValue,
   unarchiveItem,
   clearValue,
+  deleteItem,
+  findItemOnBoard,
 } from "./board.mjs";
 
 const SYNC_WORKFLOW = ".github/workflows/project-status-sync.yml";
@@ -31,6 +33,9 @@ const RELEASE_ITEM = "release App";
 const TRANSFER_POLL_MS = 5000;
 const TRANSFER_LIMIT_MS = 120_000;
 const MAX_VERIFY_PASSES = 3;
+const SETTLE_MS = 30_000;
+const MAX_SYNC_CHECKS = 3;
+const APP_TOKEN_ACTION = "actions/create-github-app-token";
 const MAX_ANSWERS = 5;
 const PROGRESS_EVERY = 25;
 
@@ -174,12 +179,15 @@ async function placeItem(ctx, old, entry) {
   store.save();
 }
 
+async function ensureOnBoard(gh, boardId, contentId) {
+  return (await findItemOnBoard(gh, boardId, contentId)) ?? (await addItem(gh, boardId, contentId));
+}
+
 async function itemsPhase(ctx) {
   const { gh, deps, store } = ctx;
   const { data } = store;
   if (!data.inventory.board) return deps.log("No board, so no items to copy");
   const oldItems = await readItems(gh, data.inventory.board.id);
-  const existing = new Map((await readItems(gh, data.newBoard.id)).filter(item => item.url).map(item => [item.url, item]));
   const copyable = oldItems.filter(isCopyable);
   const redacted = oldItems.filter(item => item.type === "REDACTED").length;
   if (redacted) store.note(`${redacted} redacted items can't be read, so they weren't copied`);
@@ -190,8 +198,7 @@ async function itemsPhase(ctx) {
     let entry = data.mapping[old.id];
     if (!entry?.done) {
       if (!entry) {
-        const found = existing.get(old.url);
-        entry = { newId: found ? found.id : await addItem(gh, data.newBoard.id, old.contentId), done: false };
+        entry = { newId: await ensureOnBoard(gh, data.newBoard.id, old.contentId), done: false };
         data.mapping[old.id] = entry;
         store.save();
       }
@@ -208,12 +215,14 @@ async function repair(ctx, issue, oldByUrl, newByUrl) {
   const board = store.data.newBoard;
   const old = oldByUrl.get(issue.url);
   if (issue.kind === "missing") {
-    const entry = { newId: await addItem(gh, board.id, old.contentId), done: false };
+    const entry = { newId: await ensureOnBoard(gh, board.id, old.contentId), done: false };
     store.data.mapping[old.id] = entry;
     store.save();
     await placeItem(ctx, old, entry);
   } else if (issue.kind === "value") {
     await setValue(gh, board, newByUrl.get(issue.url).id, issue.field, issue.expected);
+  } else if (issue.kind === "unexpected") {
+    await deleteItem(gh, board.id, newByUrl.get(issue.url).id);
   } else if (issue.kind === "extra") {
     await clearValue(gh, board, newByUrl.get(issue.url).id, issue.field);
   } else if (issue.kind === "archived") {
@@ -222,13 +231,14 @@ async function repair(ctx, issue, oldByUrl, newByUrl) {
   }
 }
 
-const fixable = issue => ["missing", "value", "extra", "archived"].includes(issue.kind);
+const fixable = issue => ["missing", "value", "extra", "archived", "unexpected"].includes(issue.kind);
 
 async function verifyPhase(ctx) {
   const { gh, deps, store } = ctx;
   const { data } = store;
   if (!data.inventory.board) return deps.log("No board, so nothing to verify");
   const check = async () => {
+    await deps.sleep(SETTLE_MS);
     const oldItems = await readItems(gh, data.inventory.board.id);
     const newItems = await readItems(gh, data.newBoard.id);
     const { issues } = compareBoards(oldItems, newItems);
@@ -290,7 +300,12 @@ async function boardSyncPhase(ctx) {
   const { gh, deps, repo, org } = ctx;
   if (!ctx.store.data.inventory.syncWorkflow) return deps.log(`${repo} has no ${SYNC_WORKFLOW}, so there's nothing to switch`);
   deps.log(`${slug(ctx)} needs the App variant of board sync, from ${SYNC_TEMPLATE}. Put it in through that repository's own PR process.`);
-  await waitFor(deps, "Type done once the App variant is merged: ");
+  for (let attempt = 1; ; attempt += 1) {
+    await waitFor(deps, "Type done once the App variant is merged: ");
+    if ((await gh.fileText(org, repo, SYNC_WORKFLOW))?.includes(APP_TOKEN_ACTION)) break;
+    if (attempt >= MAX_SYNC_CHECKS) throw new Error(`${SYNC_WORKFLOW} on ${slug(ctx)}'s default branch doesn't use ${APP_TOKEN_ACTION} yet: merge the App variant, then re-run`);
+    deps.log(`${SYNC_WORKFLOW} on ${slug(ctx)}'s default branch doesn't use ${APP_TOKEN_ACTION} yet`);
+  }
   if ((await gh.secretNames(slug(ctx))).includes(SYNC_SECRET)) {
     await gh.deleteSecret(slug(ctx), SYNC_SECRET);
     deps.log(`Deleted ${SYNC_SECRET} from ${org}/${repo}`);
@@ -301,10 +316,12 @@ async function releaseAppPhase(ctx) {
   const { gh, deps, repo } = ctx;
   if (!ctx.store.data.inventory.releaseApp) return deps.log(`${repo} has no release App`);
   const vault = new Vault(deps, { vault: ctx.vault, folder: repo });
-  const item = await vault.find(RELEASE_ITEM);
+  const item = await vault.find(RELEASE_ITEM, { create: false });
   if (item) {
     await vault.trash(item);
     deps.log(`Moved the old ${RELEASE_ITEM} item in Pass to the bin`);
+  } else {
+    deps.log(`No old ${RELEASE_ITEM} item was found in ${ctx.vault}/${repo}: check Pass by hand before creating the new App`);
   }
   if ((await gh.secretNames(slug(ctx))).includes(RELEASE_SECRET)) await gh.deleteSecret(slug(ctx), RELEASE_SECRET);
   if ((await gh.variableNames(slug(ctx))).includes(RELEASE_VARIABLE)) await gh.deleteVariable(slug(ctx), RELEASE_VARIABLE);

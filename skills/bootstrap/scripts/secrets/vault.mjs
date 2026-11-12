@@ -56,7 +56,13 @@ export class Vault {
     return (await this.#folderItems(options)).filter(entry => entry.title === title).map(entry => entry.id);
   }
 
-  async find(title) {
+  async find(title, { create = true } = {}) {
+    if (!create && !this.#folderId) {
+      const found = await this.#matchingFolders();
+      if (!found.length) return null;
+      if (found.length > 1) throw new Error(`Found ${found.length} folders named ${this.folder} in vault ${this.vault}: expected one`);
+      this.#folderId = found[0].id;
+    }
     const ids = await this.#activeIds(title);
     if (ids.length > 1) throw new Error(`Found ${ids.length} active items titled ${title} in folder ${this.folder}: remove the extras and re-run`);
     return ids[0] ?? null;

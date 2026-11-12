@@ -211,11 +211,12 @@ test("the board-sync phase deletes PROJECT_STATUS_PAT only after confirmation", 
   assert.equal(repo.secrets.has("PROJECT_STATUS_PAT"), true);
   assert.equal(fake.mutations.some(label => label.startsWith("secret delete")), false);
 
+  const scripted = scriptedAnswers(fake);
   let atPrompt;
   assert.equal(
     await go(question => {
       if (/App variant/.test(question)) atPrompt = repo.secrets.has("PROJECT_STATUS_PAT");
-      return "done";
+      return scripted(question);
     }),
     0,
     fake.logs.join("\n"),
@@ -289,4 +290,51 @@ test("the link phase can be run twice without a second link or an error", async 
   assert.equal(fake.logs.filter(line => line === "Phase link").length, 2);
   assert.equal(fake.mutations.filter(label => label === "LinkRepo").length, 1);
   assert.equal(fake.repos.get("acme/widgets").linked.length, 1);
+});
+
+test("board-sync keeps PROJECT_STATUS_PAT until the default branch really uses the App token", async () => {
+  const { fake, go, repo } = setup({ withBoard: false, releaseApp: false });
+  assert.equal(await go(() => "done"), 1);
+  assert.match(fake.logs.join("\n"), /doesn't use actions\/create-github-app-token yet/);
+  assert.equal(fake.prompts.filter(question => /App variant/.test(question)).length, 3);
+  assert.equal(repo.secrets.has("PROJECT_STATUS_PAT"), true);
+});
+
+test("verify removes items a board workflow added that were never on the old board, and nothing is added twice", async () => {
+  const { fake, go, board } = setup();
+  const parent = board.items.find(item => item.contentId && !item.isArchived);
+  const child = fake.addItem(board, { contentId: fake.addContent("alice/widgets"), values: { Status: { type: "single", value: "Todo" } } });
+  const stray = fake.addContent("alice/widgets");
+  fake.hooks.afterAdd = (project, item) => {
+    if (project.owner !== "acme" || item.contentId !== parent.contentId) return;
+    fake.addItem(project, { contentId: child.contentId });
+    fake.addItem(project, { contentId: stray });
+  };
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  const items = newBoard(fake).items.filter(entry => entry.contentId);
+  assert.equal(new Set(items.map(entry => entry.contentId)).size, items.length);
+  assert.equal(items.some(entry => entry.contentId === stray), false);
+  assert.equal(items.filter(entry => entry.contentId === child.contentId).length, 1);
+  assert.equal(items.find(entry => entry.contentId === child.contentId).values.Status.value, "Todo");
+  assert.ok(fake.mutations.includes("DeleteItem"));
+  assert.equal(fake.mutations.filter(label => label === "AddItem").length, 5);
+});
+
+test("verify waits for late workflows to land before each comparison", async () => {
+  const { fake, go } = setup();
+  fake.hooks.afterAdd = (project, item) => {
+    if (project.owner === "acme") fake.late.push(() => (item.values.Status = { type: "single", value: "Todo" }));
+  };
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  const settles = fake.sleeps.filter(ms => ms === 30_000).length;
+  assert.match(fake.logs.join("\n"), /Verify pass 1/);
+  assert.equal(settles, 1 + fake.logs.filter(line => line.startsWith("Verify pass")).length);
+});
+
+test("release-app doesn't create a Pass folder, and says when no old item was found", async () => {
+  const { fake, go } = setup({ withBoard: false, syncWorkflow: false, passFolder: false });
+  assert.equal(await go(), 0, fake.logs.join("\n"));
+  assert.equal(fake.calls.some(call => call.cmd === "pass-cli" && call.args[1] === "create"), false);
+  assert.match(fake.logs.join("\n"), /No old release App item was found in Dev\/widgets/);
+  assert.deepEqual(fake.trashed, []);
 });

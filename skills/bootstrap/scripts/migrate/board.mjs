@@ -31,6 +31,12 @@ const ITEM_VALUES = `query ItemValues($id: ID!, $after: String) {
 const ORGANISATION_BOARDS = `query OrganisationBoards($login: String!, $title: String!, $after: String) {
   organization(login: $login) { projectsV2(first: 100, after: $after, query: $title) { nodes { id number title } ${PAGE} } }
 }`;
+const CONTENT_ITEMS = `query ContentItems($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on Issue { projectItems(first: 100, after: $after, includeArchived: true) { nodes { id project { id } } ${PAGE} } }
+    ... on PullRequest { projectItems(first: 100, after: $after, includeArchived: true) { nodes { id project { id } } ${PAGE} } }
+  }
+}`;
 const WORKFLOWS = `query BoardWorkflows($id: ID!, $after: String) {
   node(id: $id) { ... on ProjectV2 { workflows(first: 100, after: $after) { nodes { name enabled } ${PAGE} } } }
 }`;
@@ -97,6 +103,11 @@ export async function boardsInOrganisation(gh, org, title) {
   return nodes.filter(node => node.title === title);
 }
 
+export async function findItemOnBoard(gh, boardId, contentId) {
+  const nodes = await gh.paginate(CONTENT_ITEMS, { id: contentId }, data => data.node.projectItems);
+  return nodes.find(node => node.project.id === boardId)?.id ?? null;
+}
+
 export async function boardWorkflows(gh, id) {
   return gh.paginate(WORKFLOWS, { id }, data => data.node.workflows);
 }
@@ -138,6 +149,10 @@ export async function clearValue(gh, board, itemId, fieldName) {
   );
 }
 
+export async function deleteItem(gh, boardId, itemId) {
+  await gh.graphql("mutation DeleteItem($input: DeleteProjectV2ItemInput!) { deleteProjectV2Item(input: $input) { deletedItemId } }", { input: { projectId: boardId, itemId } });
+}
+
 export async function linkRepository(gh, boardId, repositoryId) {
   await gh.graphql("mutation LinkRepo($input: LinkProjectV2ToRepositoryInput!) { linkProjectV2ToRepository(input: $input) { repository { id } } }", { input: { projectId: boardId, repositoryId } });
 }
@@ -175,6 +190,8 @@ export function compareBoards(oldItems, newItems) {
     if (found.has(item.url)) issues.push({ kind: "duplicate", url: item.url });
     found.set(item.url, item);
   }
+  const expectedUrls = new Set(oldItems.filter(isCopyable).map(item => item.url));
+  for (const item of newItems) if (item.url && !expectedUrls.has(item.url)) issues.push({ kind: "unexpected", url: item.url });
   for (const old of oldItems.filter(isCopyable)) {
     const current = found.get(old.url);
     if (!current) {
@@ -199,5 +216,6 @@ export function describeIssue(issue) {
   if (issue.kind === "value") return `${issue.url}: ${issue.field} should be ${JSON.stringify(issue.expected.value)}, found ${issue.actual ? JSON.stringify(issue.actual.value) : "nothing"}`;
   if (issue.kind === "extra") return `${issue.url}: ${issue.field} has a value on the new board but none on the old one`;
   if (issue.kind === "archived") return `${issue.url}: should${issue.expected ? "" : " not"} be archived`;
+  if (issue.kind === "unexpected") return `${issue.url}: is on the new board but wasn't on the old one`;
   return `${issue.url}: ${issue.kind === "missing" ? "isn't on the new board" : "is on the new board more than once"}`;
 }

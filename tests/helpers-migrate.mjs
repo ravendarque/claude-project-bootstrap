@@ -34,6 +34,7 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     crash: null,
     hooks: {},
     transferPolls: 2,
+    late: [],
   };
   const numbers = new Map();
   const nextNumber = owner => {
@@ -47,7 +48,7 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
   };
 
   function addRepo(owner, name, extra = {}) {
-    const repo = { node_id: id("R"), owner, name, secrets: new Set(), variables: new Map(), pages: null, files: new Set(), linked: [], ...extra };
+    const repo = { node_id: id("R"), owner, name, secrets: new Set(), variables: new Map(), pages: null, files: new Map(), linked: [], ...extra };
     world.repos.set(`${owner}/${name}`, repo);
     return repo;
   }
@@ -126,7 +127,19 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
       case "BoardFields":
         return { node: { fields: connection(world.projects.get(v.id).fields, v.after, f => ({ id: f.id, name: f.name, dataType: f.dataType, ...(f.options && { options: f.options }) })) } };
       case "BoardItems":
+        while (world.late.length) world.late.shift()();
         return { node: { items: connection(world.projects.get(v.id).items, v.after, itemNode) } };
+      case "ContentItems": {
+        const nodes = [];
+        for (const project of world.projects.values()) for (const item of project.items) if (item.contentId === v.id) nodes.push({ id: item.id, project: { id: project.id } });
+        return { node: { projectItems: connection(nodes, v.after) } };
+      }
+      case "DeleteItem": {
+        mutate("DeleteItem");
+        const project = world.projects.get(v.input.projectId);
+        project.items = project.items.filter(item => item.id !== v.input.itemId);
+        return { deleteProjectV2Item: { deletedItemId: v.input.itemId } };
+      }
       case "ItemValues":
         return { node: { fieldValues: connection(valueNodes(findItem(v.id).item), v.after) } };
       case "OrganisationBoards":
@@ -239,7 +252,8 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
     }
     if (method === "GET" && repoMatch?.[3]?.startsWith("contents/")) {
       const repo = world.repos.get(`${repoMatch[1]}/${repoMatch[2]}`);
-      return repo.files.has(repoMatch[3].slice("contents/".length)) ? reply(200, { type: "file" }) : reply(404, { message: "Not Found" });
+      const file = repo.files.get(repoMatch[3].slice("contents/".length));
+      return file === undefined ? reply(404, { message: "Not Found" }) : reply(200, { type: "file", encoding: "base64", content: Buffer.from(file).toString("base64") });
     }
     if (method === "GET" && route === "user/packages") return reply(200, world.packages);
     throw new Error(`fake GitHub: unknown REST call ${method} ${path}`);
@@ -293,7 +307,7 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
 
   function passCli(args) {
     const key = args.slice(0, 2).join(" ");
-    if (key === "folder list") return text(JSON.stringify([{ id: "f1", parent_folder_id: null, content: { name: world.passFolder } }]));
+    if (key === "folder list") return text(JSON.stringify(world.passFolder ? [{ id: "f1", parent_folder_id: null, content: { name: world.passFolder } }] : []));
     if (key === "item list") return text(JSON.stringify({ items: world.passItems.filter(item => !world.trashed.includes(item.id)) }));
     if (key === "item trash") {
       world.trashed.push(args.find(arg => arg.startsWith("--item-id=")).slice("--item-id=".length));
@@ -305,19 +319,19 @@ export function createFake({ login = "alice", pageSize = 3, org = "acme" } = {})
   return Object.assign(world, { exec, addRepo, addProject, addContent, addItem, urlOf, itemNode });
 }
 
-export function seedWorld(fake, { releaseApp = true, syncWorkflow = true, withBoard = true } = {}) {
+export function seedWorld(fake, { releaseApp = true, syncWorkflow = true, withBoard = true, passFolder = true } = {}) {
   const repo = fake.addRepo(fake.login, "widgets", {
     pages: { html_url: "https://widgets.example.com/", cname: "widgets.example.com" },
   });
   repo.variables.set("UNRELATED", "x");
   if (syncWorkflow) {
-    repo.files.add(".github/workflows/project-status-sync.yml");
+    repo.files.set(".github/workflows/project-status-sync.yml", "token: ${{ secrets.PROJECT_STATUS_PAT }}");
     repo.secrets.add("PROJECT_STATUS_PAT");
   }
   if (releaseApp) {
     repo.secrets.add("RELEASE_APP_PRIVATE_KEY");
     repo.variables.set("RELEASE_APP_CLIENT_ID", "Iv1.old");
-    fake.passFolder = "widgets";
+    if (passFolder) fake.passFolder = "widgets";
     fake.passItems.push({ id: "-oldpassid", title: "release App", folder_id: "f1" });
   }
   fake.packages = [{ name: "widgets-lib", repository: { name: "widgets" } }, { name: "other", repository: { name: "elsewhere" } }];
@@ -370,6 +384,7 @@ export function scriptedAnswers(fake, title = "Widgets") {
     if (/Auto-add/.test(question)) {
       for (const project of fake.projects.values()) if (project.owner === fake.org) project.workflows.find(w => w.name === "Auto-add to project").enabled = true;
     }
+    if (/App variant/.test(question)) fake.repos.get(`${fake.org}/widgets`).files.set(".github/workflows/project-status-sync.yml", "uses: actions/create-github-app-token@v1");
     if (/new release App/.test(question)) {
       const repo = fake.repos.get(`${fake.org}/widgets`);
       repo.secrets.add("RELEASE_APP_PRIVATE_KEY");
