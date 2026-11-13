@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brokenLinks, renderReal } from "./helpers.mjs";
 
@@ -54,17 +55,43 @@ test("a Preview repeats every binding of env.preview, because it inherits nothin
   }
 });
 
-test("the Preview upload prints wrangler's error when it fails, and still finds the URL among stderr noise", () => {
+test("the Preview upload posts the URL, and prints wrangler's stderr and stdout when it fails", () => {
   const workflow = read(withBeta, ".github/workflows/preview.yml");
-  assert.match(workflow, /if ! OUTPUT=\$\(pnpm exec wrangler preview .* --json 2>&1\); then\n\s+echo "\$OUTPUT" >&2\n\s+exit 1\n\s+fi/);
-  const extract = /^\s+(URL=\$\(echo "\$OUTPUT" \| awk .*)$/m.exec(workflow)[1];
-  const run = output => spawnSync("bash", ["-c", `set -euo pipefail\n${extract}\necho "$URL"`], { env: { ...process.env, OUTPUT: output }, encoding: "utf8" });
-  const json = '{\n  "preview": {\n    "urls": [\n      "https://pr-1.example.test"\n    ]\n  }\n}';
-  assert.equal(run(json).stdout.trim(), "https://pr-1.example.test");
-  assert.equal(run(`warning: something\n{\nnot json at all\n${json}`).stdout.trim(), "https://pr-1.example.test");
-  const none = run("an error from wrangler");
-  assert.equal(none.status, 0);
-  assert.equal(none.stdout.trim(), "");
+  const start = workflow.indexOf("set -euo pipefail\n          ERR=");
+  const script = workflow
+    .slice(start, workflow.indexOf("      - name: Comment the Preview URL"))
+    .split("\n")
+    .map(line => line.replace(/^ {10}/, ""))
+    .join("\n");
+  const scratch = mkdtempSync(join(tmpdir(), "preview-"));
+  mkdirSync(join(scratch, "bin"));
+  writeFileSync(join(scratch, "bin", "pnpm"), 'printf "%s" "$FAKE_STDOUT"\nprintf "%s" "$FAKE_STDERR" >&2\nexit "${FAKE_EXIT:-0}"\n', { mode: 0o755 });
+  const run = ({ stdout = "", stderr = "", exit = 0 }) => {
+    const output = join(scratch, "output");
+    writeFileSync(output, "");
+    const result = spawnSync("bash", ["-c", script], {
+      env: { ...process.env, PATH: `${join(scratch, "bin")}:${process.env.PATH}`, RUNNER_TEMP: scratch, PR_NUMBER: "1", GITHUB_OUTPUT: output, FAKE_STDOUT: stdout, FAKE_STDERR: stderr, FAKE_EXIT: String(exit) },
+      encoding: "utf8",
+    });
+    return { ...result, written: readFileSync(output, "utf8") };
+  };
+  const json = '{\n  "preview": {\n    "urls": [\n      "https://pr-1.example.test"\n    ]\n  }\n}\n';
+
+  const ok = run({ stdout: json, stderr: "a warning\n" });
+  assert.equal(ok.status, 0);
+  assert.equal(ok.written, "url=https://pr-1.example.test\n");
+
+  const failed = run({ stdout: "partial\n", stderr: "Authentication error [code: 10000]\n", exit: 1 });
+  assert.equal(failed.status, 1);
+  assert.match(failed.stderr, /Authentication error/);
+  assert.match(failed.stderr, /partial/);
+  assert.equal(failed.written, "");
+
+  const none = run({ stdout: "no json here\n", stderr: "something odd\n" });
+  assert.equal(none.status, 1);
+  assert.match(none.stderr, /something odd/);
+  assert.match(none.stderr, /no json here/);
+  assert.match(none.stdout, /::error::wrangler didn't report a Preview URL/);
 });
 
 test("infra and wrangler config can never ride a release: none", () => {
