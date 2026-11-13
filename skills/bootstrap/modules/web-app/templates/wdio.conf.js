@@ -43,7 +43,7 @@ const selected = (process.env.E2E_BROWSERS ?? "chrome,firefox").split(",").map(n
 const SAFARI_TAG = "@safari";
 const safariOnly = selected.length === 1 && selected[0] === "safari";
 if (selected.includes("safari") && !safariOnly)
-  throw new Error("Safari runs on its own in E2E_BROWSERS: it runs only the specs tagged " + SAFARI_TAG);
+  throw new Error(`Safari runs on its own in E2E_BROWSERS: it runs only the specs tagged ${SAFARI_TAG}`);
 
 export const config = {
   runner: "local",

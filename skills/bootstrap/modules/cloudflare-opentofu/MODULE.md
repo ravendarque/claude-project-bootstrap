@@ -46,7 +46,9 @@ and preview hostnames are built from it.
 
 - `wrangler.jsonc`: environments `production`, `beta` (beta only),
   `preview` (the only one with workers.dev) and `e2e`, each repeating every
-  binding.
+  binding. A Workers Preview inherits nothing from its environment, so a
+  binding added to `env.preview` is repeated under `env.preview.previews`
+  too; a test checks they match.
 - `infra/`: provider and R2 backend, DNS placeholder records (and `beta.`),
   CAA, TLS 1.2 minimum, HSTS, always HTTPS, DNSSEC, security headers, cache
   rules, and a README with setup, disaster recovery and teardown.
