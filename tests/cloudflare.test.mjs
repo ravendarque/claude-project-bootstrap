@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { brokenLinks, renderReal } from "./helpers.mjs";
@@ -40,6 +41,30 @@ test("every environment repeats the assets binding and only preview has workers.
     assert.equal(env.assets?.binding, "ASSETS", name);
     assert.equal(env.workers_dev === true, name === "preview", name);
   }
+});
+
+const PREVIEW_BINDINGS = ["vars", "kv_namespaces", "d1_databases", "r2_buckets", "durable_objects", "ratelimits", "send_email", "version_metadata", "services", "queues"];
+
+test("a Preview repeats every binding of env.preview, because it inherits nothing", () => {
+  for (const dir of [withBeta, noBeta]) {
+    const { preview } = jsonc(read(dir, "wrangler.jsonc")).env;
+    assert.ok(preview.previews, "env.preview.previews");
+    assert.deepEqual(preview.previews.vars, { APP_ENV: "preview" });
+    for (const key of PREVIEW_BINDINGS.filter(name => name in preview)) assert.deepEqual(preview.previews[key], preview[key], key);
+  }
+});
+
+test("the Preview upload prints wrangler's error when it fails, and still finds the URL among stderr noise", () => {
+  const workflow = read(withBeta, ".github/workflows/preview.yml");
+  assert.match(workflow, /if ! OUTPUT=\$\(pnpm exec wrangler preview .* --json 2>&1\); then\n\s+echo "\$OUTPUT" >&2\n\s+exit 1\n\s+fi/);
+  const extract = /^\s+(URL=\$\(echo "\$OUTPUT" \| awk .*)$/m.exec(workflow)[1];
+  const run = output => spawnSync("bash", ["-c", `set -euo pipefail\n${extract}\necho "$URL"`], { env: { ...process.env, OUTPUT: output }, encoding: "utf8" });
+  const json = '{\n  "preview": {\n    "urls": [\n      "https://pr-1.example.test"\n    ]\n  }\n}';
+  assert.equal(run(json).stdout.trim(), "https://pr-1.example.test");
+  assert.equal(run(`warning: something\n{\nnot json at all\n${json}`).stdout.trim(), "https://pr-1.example.test");
+  const none = run("an error from wrangler");
+  assert.equal(none.status, 0);
+  assert.equal(none.stdout.trim(), "");
 });
 
 test("infra and wrangler config can never ride a release: none", () => {

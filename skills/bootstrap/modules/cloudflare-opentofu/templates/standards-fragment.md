@@ -22,7 +22,9 @@ whether the design is idiomatic for the platform rather than fighting it.
   permission.
 - **Every wrangler environment repeats every binding.** An environment that
   leaves one out doesn't inherit it, or worse, a misconfigured one inherits
-  production's.
+  production's. A binding on `env.preview` is also repeated under
+  `env.preview.previews`, because a Workers Preview inherits nothing from its
+  environment.
 - **API responses for changing data send `Cache-Control: no-store`.**
 - **Verify platform behaviour empirically** (a real request, `wrangler dev`,
   `--dry-run`) rather than trusting documentation alone.
