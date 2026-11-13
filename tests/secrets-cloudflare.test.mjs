@@ -1,4 +1,7 @@
 import { test } from "node:test";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import { loadContext } from "../skills/bootstrap/scripts/secrets/context.mjs";
 import { saveRun } from "../skills/bootstrap/scripts/state.mjs";
@@ -424,4 +427,40 @@ test("a GitHub failure at a rotated token keeps its old token, which GitHub stil
   const { run } = harness({ cf, items, passAnswers: oldTokens, fail: (cmd, args) => cmd === "gh" && args[2] === "CLOUDFLARE_DEPLOY_TOKEN" });
   await assert.rejects(run({ rotate: true }), /not set: CLOUDFLARE_DEPLOY_TOKEN/);
   assert.deepEqual(deletedTokens(cf).sort(), ["oldtok0", "self", "tok3", "tok4"]);
+});
+
+test("a second project on the same account asks only for its zone id, and the first run's ids are stored", async () => {
+  const config = mkdtempSync(join(tmpdir(), "config-"));
+  const asking = harness();
+  const asked = [];
+  const inner = asking.deps.prompt;
+  asking.deps.prompt = async question => {
+    asked.push(question);
+    return inner(question);
+  };
+  await asking.run({ configDir: config });
+  assert.equal(asked.filter(question => /account id/i.test(question)).length, 1);
+  assert.equal(asked.filter(question => /zone id/i.test(question)).length, 1);
+  assert.equal(JSON.parse(readFileSync(join(config, "cloudflare.json"), "utf8")).account_id, ACCOUNT);
+
+  const next = harness();
+  const nextAsked = [];
+  const nextInner = next.deps.prompt;
+  next.deps.prompt = async question => {
+    nextAsked.push(question);
+    return nextInner(question);
+  };
+  await next.run({ configDir: config });
+  assert.equal(nextAsked.some(question => /account id/i.test(question)), false);
+  assert.equal(nextAsked.some(question => /zone id/i.test(question)), true);
+
+  const r2 = harness({ step: cloudflareR2 });
+  const r2Asked = [];
+  const r2Inner = r2.deps.prompt;
+  r2.deps.prompt = async question => {
+    r2Asked.push(question);
+    return r2Inner(question);
+  };
+  await r2.run({ configDir: config });
+  assert.equal(r2Asked.some(question => /account id/i.test(question)), false);
 });

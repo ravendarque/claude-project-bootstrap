@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { askId, buildPolicies, createVerified, findEarlierItems, oneYearFrom, readOldIds, resolvePermissions, storeEach, withBootstrapToken } from "../cloudflare.mjs";
+import { buildPolicies, createVerified, findEarlierItems, oneYearFrom, readOldIds, resolvePermissions, storeEach, withBootstrapToken } from "../cloudflare.mjs";
+import { resolveAccountId, resolveZoneId } from "../ids.mjs";
 import { storeThenSet } from "../order.mjs";
 
 const title = token => `Cloudflare ${token} token`;
@@ -16,11 +17,12 @@ function readTokens(ctx) {
 
 const secretsFor = (entry, value) => (entry.env ?? [undefined]).map(env => ({ name: entry.secret, ...(env && { env }), value }));
 
-async function run(ctx, deps, { vault, rotate }) {
+async function run(ctx, deps, options) {
+  const { vault, rotate } = options;
   const tokens = readTokens(ctx);
   const previous = await findEarlierItems(deps, vault, tokens.map(entry => title(entry.token)), rotate);
-  const accountId = await askId(deps, "Cloudflare account id (32 hex characters; on the zone's Overview page, bottom right) ");
-  const zoneId = await askId(deps, `Zone id for ${ctx.zoneName ?? "the zone"} (32 hex characters; on the zone's Overview page, bottom right) `);
+  const accountId = await resolveAccountId(ctx, deps, options);
+  const zoneId = await resolveZoneId(ctx, deps, options);
   const expires = oneYearFrom(deps.now());
 
   await withBootstrapToken(deps, accountId, async client => {

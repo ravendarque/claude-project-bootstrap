@@ -1,4 +1,5 @@
-import { askId, bucketResource, createVerified, findEarlierItems, oneYearFrom, R2_BUCKET_SCOPE, readOldIds, resolvePermissions, s3Credentials, storeEach, withBootstrapToken } from "../cloudflare.mjs";
+import { bucketResource, createVerified, findEarlierItems, oneYearFrom, R2_BUCKET_SCOPE, readOldIds, resolvePermissions, s3Credentials, storeEach, withBootstrapToken } from "../cloudflare.mjs";
+import { resolveAccountId } from "../ids.mjs";
 import { storeThenSet } from "../order.mjs";
 
 const PAIRS = [
@@ -6,9 +7,10 @@ const PAIRS = [
   { title: "R2 state read-only", permission: "Workers R2 Storage Bucket Item Read", id: "TF_STATE_READ_ACCESS_KEY_ID", secret: "TF_STATE_READ_SECRET_ACCESS_KEY" },
 ];
 
-async function run(ctx, deps, { vault, rotate }) {
+async function run(ctx, deps, options) {
+  const { vault, rotate } = options;
   const previous = await findEarlierItems(deps, vault, PAIRS.map(pair => pair.title), rotate);
-  const accountId = await askId(deps, "Cloudflare account id (32 hex characters; on the zone's Overview page, bottom right) ");
+  const accountId = await resolveAccountId(ctx, deps, options);
   const resource = bucketResource(accountId, `${ctx.slug}-tfstate`);
   const expires = oneYearFrom(deps.now());
 
