@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadContext } from "./secrets/context.mjs";
 import { realDeps } from "./secrets/deps.mjs";
 import { secretsExist } from "./secrets/github.mjs";
+import { checkFlagId, defaultConfigDir } from "./secrets/ids.mjs";
 import { storeThenSet } from "./secrets/order.mjs";
 import { Vault } from "./secrets/vault.mjs";
 
@@ -11,7 +12,7 @@ export { storeThenSet };
 
 export const STEP_NAMES = ["release-app", "board-app", "board-app-repo", "board-token", "android-keystore", "cloudflare-tokens", "cloudflare-r2"];
 
-const USAGE = `Usage: secrets.mjs <step> <project dir> [--vault <name>] [--rotate]
+const USAGE = `Usage: secrets.mjs <step> <project dir> [--vault <name>] [--rotate] [--account-id <id>] [--zone-id <id>]
 Steps: ${STEP_NAMES.join(", ")}`;
 
 async function checkTool(deps, tool, args, notInstalled, notSignedIn) {
@@ -37,12 +38,19 @@ async function loadStep(name, steps) {
   return (await import(url)).default;
 }
 
-export async function runCli(argv, deps, { steps } = {}) {
+export async function runCli(argv, deps, { steps, configDir = defaultConfigDir() } = {}) {
   let parsed;
   try {
-    parsed = parseArgs({ args: argv, allowPositionals: true, options: { vault: { type: "string", default: "Dev" }, rotate: { type: "boolean", default: false } } });
+    parsed = parseArgs({ args: argv, allowPositionals: true, options: { vault: { type: "string", default: "Dev" }, rotate: { type: "boolean", default: false }, "account-id": { type: "string" }, "zone-id": { type: "string" } } });
   } catch {
     deps.log(USAGE);
+    return 2;
+  }
+  let flags;
+  try {
+    flags = { accountId: checkFlagId("--account-id", parsed.values["account-id"]), zoneId: checkFlagId("--zone-id", parsed.values["zone-id"]) };
+  } catch (error) {
+    deps.log(error.message);
     return 2;
   }
   const [name, dir] = parsed.positionals;
@@ -66,7 +74,7 @@ export async function runCli(argv, deps, { steps } = {}) {
       return 0;
     }
     const vault = new Vault(deps, { vault: parsed.values.vault, folder: step.folder?.(ctx) ?? ctx.slug });
-    await step.run(ctx, deps, { vault, rotate: parsed.values.rotate });
+    await step.run(ctx, deps, { vault, rotate: parsed.values.rotate, accountId: flags.accountId, zoneId: flags.zoneId, configDir });
     return 0;
   } catch (error) {
     deps.log(error.message);

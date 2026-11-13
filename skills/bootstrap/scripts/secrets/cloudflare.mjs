@@ -86,7 +86,9 @@ export function oneYearFrom(now) {
   return expiry.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-const HEX_ID = /^[0-9a-f]{32}$/;
+export const HEX_ID = /^[0-9a-f]{32}$/;
+
+export const isHexId = value => HEX_ID.test(value);
 
 export async function askId(deps, question) {
   const id = (await deps.prompt(question)).trim();

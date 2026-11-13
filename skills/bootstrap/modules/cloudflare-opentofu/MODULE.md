@@ -153,6 +153,17 @@ four tokens, reads each back to check its policies, stores them in Proton
 Pass, sets the secrets and the `CLOUDFLARE_ACCOUNT_ID` variable, and deletes
 the bootstrap token.
 
+The ids aren't secret, so the script remembers them. The account id is the
+same for every project, so it's stored once per user in
+`${XDG_CONFIG_HOME:-~/.config}/claude-project-bootstrap/cloudflare.json`
+(mode 600). The zone id is per project, so it's stored in the project's
+`.bootstrap/state.json` as `ids.cloudflare_zone_id`. Each run uses, in
+order, the `--account-id` or `--zone-id` flag (32 hexadecimal characters; it
+replaces the stored value), then the stored value, then a prompt whose
+answer is stored. It logs which it used, and ignores a stored value that
+isn't 32 hexadecimal characters, with a warning. A second project on the
+same account is asked only for its zone id.
+
 **By hand:** In the Cloudflare dashboard → My Profile → API Tokens (or Manage
 Account → Account API Tokens for account-owned tokens) → Create Token →
 Custom token. Create four tokens, each with a one-year expiry, scoped to
@@ -196,7 +207,9 @@ Tokens: Edit, expiring today), then run
 `node <skill dir>/scripts/secrets.mjs cloudflare-r2 <project dir>` and paste
 it at the hidden prompt, with the account id when asked. The script creates
 the two bucket-scoped tokens, derives the S3 key pairs, stores them in
-Proton Pass, sets the four secrets, and deletes the bootstrap token.
+Proton Pass, sets the four secrets, and deletes the bootstrap token. The
+account id comes from the flag, the stored value or the prompt, as in step
+1 (`--account-id` overrides it).
 
 **By hand:** Cloudflare dashboard → R2 → Manage R2 API Tokens. Create two
 tokens, both applied to the `<slug>-tfstate` bucket only:
